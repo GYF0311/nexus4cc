@@ -15,113 +15,111 @@ interface Props {
   onOpenSettings: () => void
 }
 
-const LONG_PRESS_MS = 600
-
 export default function TabBar({ windows, activeIndex, onSwitch, onClose, onAdd, onOpenSettings }: Props) {
-  const [closingIndex, setClosingIndex] = useState<number | null>(null)
-  const longPressTimer = useRef<number | null>(null)
-  const isLongPress = useRef(false)
+  const [menuIndex, setMenuIndex] = useState<number | null>(null)
+  const [menuPos, setMenuPos] = useState({ x: 0, y: 0 })
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const activeTabRef = useRef<HTMLDivElement>(null)
 
+  // 自动滚动到激活的 tab
   useEffect(() => {
-    return () => {
-      if (longPressTimer.current) {
-        window.clearTimeout(longPressTimer.current)
-      }
-    }
-  }, [])
+    if (activeTabRef.current && scrollRef.current) {
+      const scrollContainer = scrollRef.current
+      const activeTab = activeTabRef.current
+      const containerRect = scrollContainer.getBoundingClientRect()
+      const tabRect = activeTab.getBoundingClientRect()
 
-  function handleTouchStart(index: number) {
-    isLongPress.current = false
-    longPressTimer.current = window.setTimeout(() => {
-      isLongPress.current = true
-      setClosingIndex(index)
-    }, LONG_PRESS_MS)
+      const scrollLeft = tabRect.left - containerRect.left + scrollContainer.scrollLeft - containerRect.width / 2 + tabRect.width / 2
+      scrollContainer.scrollTo({ left: scrollLeft, behavior: 'smooth' })
+    }
+  }, [activeIndex])
+
+  function handleContextMenu(e: React.MouseEvent | React.TouchEvent, index: number) {
+    e.preventDefault()
+    e.stopPropagation()
+
+    let clientX: number, clientY: number
+    if ('touches' in e) {
+      clientX = e.touches[0].clientX
+      clientY = e.touches[0].clientY
+    } else {
+      clientX = (e as React.MouseEvent).clientX
+      clientY = (e as React.MouseEvent).clientY
+    }
+
+    setMenuPos({ x: clientX, y: clientY })
+    setMenuIndex(index)
   }
 
-  function handleTouchEnd(index: number) {
-    if (longPressTimer.current) {
-      window.clearTimeout(longPressTimer.current)
-      longPressTimer.current = null
-    }
-    if (!isLongPress.current) {
+  function handleClose(index: number) {
+    onClose(index)
+    setMenuIndex(null)
+  }
+
+  function handleSwitch(index: number) {
+    if (menuIndex === null) {
       onSwitch(index)
     }
   }
-
-  function handleMouseDown(index: number) {
-    isLongPress.current = false
-    longPressTimer.current = window.setTimeout(() => {
-      isLongPress.current = true
-      setClosingIndex(index)
-    }, LONG_PRESS_MS)
-  }
-
-  function handleMouseUp(index: number) {
-    if (longPressTimer.current) {
-      window.clearTimeout(longPressTimer.current)
-      longPressTimer.current = null
-    }
-    if (!isLongPress.current) {
-      onSwitch(index)
-    }
-  }
-
-  function handleConfirmClose() {
-    if (closingIndex !== null) {
-      onClose(closingIndex)
-      setClosingIndex(null)
-    }
-  }
-
-  const windowName = closingIndex !== null
-    ? windows.find(w => w.index === closingIndex)?.name || `窗口 ${closingIndex}`
-    : ''
 
   return (
     <>
       <div style={s.container}>
-        <div style={s.tabs}>
+        <div ref={scrollRef} style={s.tabs}>
           {windows.map(item => (
             <div
               key={item.index}
+              ref={item.index === activeIndex ? activeTabRef : null}
               style={{
                 ...s.tab,
                 ...(item.index === activeIndex ? s.tabActive : {}),
               }}
-              onTouchStart={() => handleTouchStart(item.index)}
-              onTouchEnd={() => handleTouchEnd(item.index)}
-              onMouseDown={() => handleMouseDown(item.index)}
-              onMouseUp={() => handleMouseUp(item.index)}
-              onMouseLeave={() => {
-                if (longPressTimer.current) {
-                  window.clearTimeout(longPressTimer.current)
-                  longPressTimer.current = null
+              onClick={() => handleSwitch(item.index)}
+              onContextMenu={(e) => handleContextMenu(e, item.index)}
+              onTouchStart={(e) => {
+                // 长按触发关闭菜单
+                const timer = setTimeout(() => handleContextMenu(e, item.index), 600)
+                const clear = () => {
+                  clearTimeout(timer)
+                  document.removeEventListener('touchend', clear)
+                  document.removeEventListener('touchmove', clear)
                 }
+                document.addEventListener('touchend', clear)
+                document.addEventListener('touchmove', clear)
               }}
             >
-              <span style={s.tabName}>{item.name}</span>
+              <span style={{
+                ...s.tabName,
+                ...(item.index === activeIndex ? s.tabNameActive : {}),
+              }}>{item.name}</span>
               {item.index === activeIndex && <span style={s.activeIndicator} />}
             </div>
           ))}
         </div>
         <div style={s.actions}>
-          <button style={s.iconBtn} onPointerDown={(e) => { e.preventDefault(); onAdd() }}>+</button>
-          <button style={s.iconBtn} onPointerDown={(e) => { e.preventDefault(); onOpenSettings() }}>⚙</button>
+          <button style={s.iconBtn} onPointerDown={(e) => { e.preventDefault(); onAdd() }} title="新建会话">+</button>
+          <button style={s.iconBtn} onPointerDown={(e) => { e.preventDefault(); onOpenSettings() }} title="设置">⚙</button>
         </div>
       </div>
 
-      {/* 关闭确认对话框 */}
-      {closingIndex !== null && (
-        <div style={s.overlay} onPointerDown={() => setClosingIndex(null)}>
-          <div style={s.dialog} onPointerDown={(e) => e.stopPropagation()}>
-            <div style={s.dialogTitle}>关闭会话</div>
-            <div style={s.dialogText}>确定要关闭 "{windowName}" 吗？</div>
-            <div style={s.dialogButtons}>
-              <button style={s.cancelBtn} onPointerDown={() => setClosingIndex(null)}>取消</button>
-              <button style={s.confirmBtn} onPointerDown={handleConfirmClose}>关闭</button>
-            </div>
+      {/* 右键/长按菜单 */}
+      {menuIndex !== null && (
+        <>
+          <div style={s.menuOverlay} onPointerDown={() => setMenuIndex(null)} />
+          <div style={{
+            ...s.contextMenu,
+            left: Math.min(menuPos.x, window.innerWidth - 120),
+            top: Math.min(menuPos.y + 10, window.innerHeight - 80),
+          }}>
+            <div style={s.menuTitle}>{windows.find(w => w.index === menuIndex)?.name}</div>
+            <button
+              style={s.menuItem}
+              onPointerDown={() => menuIndex !== null && handleClose(menuIndex)}
+            >
+              <span style={s.menuIcon}>✕</span> 关闭会话
+            </button>
           </div>
-        </div>
+        </>
       )}
     </>
   )
@@ -134,7 +132,7 @@ const s: Record<string, React.CSSProperties> = {
     background: '#16213e',
     borderBottom: '1px solid #334155',
     flexShrink: 0,
-    height: 40,
+    height: 44,
   },
   tabs: {
     display: 'flex',
@@ -144,14 +142,18 @@ const s: Record<string, React.CSSProperties> = {
     scrollbarWidth: 'none',
     msOverflowStyle: 'none',
     padding: '0 4px',
-    gap: 2,
+    gap: 4,
+    WebkitOverflowScrolling: 'touch',
   },
   tab: {
     display: 'flex',
     alignItems: 'center',
-    padding: '0 12px',
-    height: 32,
-    borderRadius: 6,
+    justifyContent: 'center',
+    padding: '0 14px',
+    height: 36,
+    minWidth: 60,
+    maxWidth: 140,
+    borderRadius: 8,
     background: 'transparent',
     cursor: 'pointer',
     position: 'relative',
@@ -159,6 +161,8 @@ const s: Record<string, React.CSSProperties> = {
     userSelect: 'none',
     touchAction: 'manipulation',
     WebkitTapHighlightColor: 'transparent',
+    transition: 'background 0.15s',
+    flexShrink: 0,
   },
   tabActive: {
     background: '#0f3460',
@@ -166,16 +170,23 @@ const s: Record<string, React.CSSProperties> = {
   tabName: {
     color: '#94a3b8',
     fontSize: 13,
-    fontFamily: 'monospace',
+    fontFamily: 'Menlo, Monaco, "Cascadia Code", monospace',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    maxWidth: 100,
+  },
+  tabNameActive: {
+    color: '#e2e8f0',
+    fontWeight: 500,
   },
   activeIndicator: {
     position: 'absolute',
-    bottom: 0,
-    left: 6,
-    right: 6,
+    bottom: 4,
+    left: '20%',
+    right: '20%',
     height: 2,
     background: '#3b82f6',
-    borderRadius: '1px 1px 0 0',
+    borderRadius: 1,
   },
   actions: {
     display: 'flex',
@@ -183,70 +194,63 @@ const s: Record<string, React.CSSProperties> = {
     gap: 4,
     padding: '0 8px',
     borderLeft: '1px solid #334155',
+    flexShrink: 0,
   },
   iconBtn: {
     background: 'transparent',
     border: 'none',
     color: '#64748b',
     cursor: 'pointer',
-    fontSize: 16,
-    padding: '4px 8px',
-    borderRadius: 4,
+    fontSize: 18,
+    padding: '6px 10px',
+    borderRadius: 6,
     touchAction: 'manipulation',
     WebkitTapHighlightColor: 'transparent',
+    transition: 'background 0.15s, color 0.15s',
   },
-  overlay: {
+  menuOverlay: {
     position: 'fixed',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    background: 'rgba(0,0,0,0.6)',
+    zIndex: 150,
+  },
+  contextMenu: {
+    position: 'fixed',
+    background: '#1e293b',
+    borderRadius: 8,
+    padding: '8px 0',
+    minWidth: 140,
+    boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+    border: '1px solid #334155',
     zIndex: 200,
+  },
+  menuTitle: {
+    color: '#64748b',
+    fontSize: 11,
+    padding: '4px 16px 8px',
+    borderBottom: '1px solid #334155',
+    marginBottom: 4,
+    maxWidth: 200,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
+  menuItem: {
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dialog: {
-    background: '#16213e',
-    borderRadius: 12,
-    padding: '20px 24px',
-    minWidth: 260,
-    maxWidth: '80vw',
-    boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-  },
-  dialogTitle: {
-    color: '#e2e8f0',
-    fontSize: 16,
-    fontWeight: 600,
-    marginBottom: 12,
-  },
-  dialogText: {
-    color: '#94a3b8',
-    fontSize: 14,
-    marginBottom: 20,
-  },
-  dialogButtons: {
-    display: 'flex',
-    gap: 12,
-    justifyContent: 'flex-end',
-  },
-  cancelBtn: {
+    gap: 8,
     background: 'transparent',
-    border: '1px solid #334155',
-    borderRadius: 6,
-    color: '#94a3b8',
-    cursor: 'pointer',
-    fontSize: 14,
-    padding: '8px 16px',
-  },
-  confirmBtn: {
-    background: '#ef4444',
     border: 'none',
-    borderRadius: 6,
-    color: '#fff',
+    color: '#ef4444',
     cursor: 'pointer',
     fontSize: 14,
     padding: '8px 16px',
+    width: '100%',
+    textAlign: 'left',
+    transition: 'background 0.15s',
+  },
+  menuIcon: {
+    fontSize: 12,
   },
 }

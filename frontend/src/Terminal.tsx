@@ -1,10 +1,11 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { Terminal as XTerm, type ITheme } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
+import { WebLinksAddon } from '@xterm/addon-web-links'
 import '@xterm/xterm/css/xterm.css'
 import Toolbar from './Toolbar'
 import SessionManager from './SessionManager'
-import TabBar from './TabBar'
+import BottomNav from './BottomNav'
 import WorkspaceSelector from './WorkspaceSelector'
 
 interface TmuxWindow {
@@ -84,6 +85,76 @@ export function getInitialTheme(): ThemeMode {
   return 'dark'
 }
 
+// 复制模式覆盖层组件
+function CopyModeOverlay({ termRef, themeMode }: { termRef: React.MutableRefObject<XTerm | null>, themeMode: ThemeMode }) {
+  const [lines, setLines] = useState<string[]>([])
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const term = termRef.current
+    if (!term) return
+
+    // 获取终端缓冲区内容
+    const buffer = term.buffer.active
+    const lineCount = buffer.length
+    const extractedLines: string[] = []
+
+    for (let i = 0; i < lineCount; i++) {
+      const line = buffer.getLine(i)
+      if (line) {
+        extractedLines.push(line.translateToString(true))
+      }
+    }
+
+    setLines(extractedLines)
+
+    // 滚动到底部
+    setTimeout(() => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+      }
+    }, 10)
+  }, [termRef])
+
+  const bg = themeMode === 'dark' ? '#1a1a2e' : '#ffffff'
+  const fg = themeMode === 'dark' ? '#e2e8f0' : '#333333'
+  const fontFamily = 'Menlo, Monaco, "Cascadia Code", "Fira Code", monospace'
+  const fontSize = termRef.current?.options.fontSize ?? 14
+
+  return (
+    <div
+      ref={scrollRef}
+      style={{
+        position: 'fixed',
+        top: 44, // 提示条高度
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: bg,
+        color: fg,
+        fontFamily,
+        fontSize,
+        lineHeight: '1.4',
+        overflow: 'auto',
+        zIndex: 99,
+        padding: 8,
+        whiteSpace: 'pre',
+        userSelect: 'text',
+        WebkitUserSelect: 'text',
+      }}
+      onClick={() => {
+        // 点击空白处不关闭，只有点击按钮才关闭
+      }}
+    >
+      {lines.map((line, i) => (
+        <div key={i} style={{ minHeight: '1.4em' }}>
+          {line || '\u00A0'}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function Terminal({ token }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<XTerm | null>(null)
@@ -95,6 +166,9 @@ export default function Terminal({ token }: Props) {
   const [showSettings, setShowSettings] = useState(false)
   const [showNewSession, setShowNewSession] = useState(false)
   const [themeMode, setThemeMode] = useState<ThemeMode>(getInitialTheme)
+  const [selectionMode, setSelectionMode] = useState(false)
+  const selectionModeRef = useRef(selectionMode)
+  selectionModeRef.current = selectionMode
 
   const applyTheme = useCallback((mode: ThemeMode) => {
     const term = termRef.current
@@ -212,15 +286,25 @@ export default function Terminal({ token }: Props) {
     })
 
     const fitAddon = new FitAddon()
+    const webLinksAddon = new WebLinksAddon()
     term.loadAddon(fitAddon)
+    term.loadAddon(webLinksAddon)
     termRef.current = term
 
     const container = containerRef.current!
     term.open(container)
     fitAddon.fit()
 
+    // Enable text selection - use auto for PC, but handle touch events for mobile scrolling
     const viewport = container.querySelector('.xterm-viewport') as HTMLElement
-    if (viewport) viewport.style.pointerEvents = 'none'
+    if (viewport) {
+      viewport.style.pointerEvents = 'auto'
+      viewport.style.userSelect = 'text'
+    }
+
+    // Enable text selection in the terminal screen element
+    const screen = container.querySelector('.xterm-screen') as HTMLElement
+    if (screen) screen.style.userSelect = 'text'
 
     term.attachCustomKeyEventHandler((e: KeyboardEvent) => {
       if (e.ctrlKey && ['w', 't', 'n', 'l', 'r'].includes(e.key.toLowerCase())) {
@@ -280,6 +364,8 @@ export default function Terminal({ token }: Props) {
     }
 
     function onTouchStart(e: TouchEvent) {
+      // 复制模式下允许默认行为（文本选择）
+      if (selectionModeRef.current) return
       if (e.touches.length === 2) {
         isPinching = true
         pinchStartDist = getTouchDist(e)
@@ -292,6 +378,8 @@ export default function Terminal({ token }: Props) {
     }
 
     function onTouchMove(e: TouchEvent) {
+      // 复制模式下不处理滚动，允许文本选择
+      if (selectionModeRef.current) return
       e.preventDefault()
       if (isPinching && e.touches.length === 2) {
         const dist = getTouchDist(e)
@@ -323,6 +411,8 @@ export default function Terminal({ token }: Props) {
     }
 
     function onTouchEnd(e: TouchEvent) {
+      // 复制模式下不处理点击
+      if (selectionModeRef.current) return
       if (isPinching) {
         isPinching = false
         return
@@ -378,6 +468,48 @@ export default function Terminal({ token }: Props) {
 
   return (
     <div style={styles.wrapper}>
+      {selectionMode && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            padding: '12px 16px',
+            background: '#1e3a5f',
+            color: '#fff',
+            fontSize: 13,
+            textAlign: 'center',
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 12,
+          }}
+        >
+          <span>📋 复制模式：长按下方文本选择复制</span>
+          <button
+            onClick={() => setSelectionMode(false)}
+            style={{
+              background: '#3b82f6',
+              border: 'none',
+              borderRadius: 4,
+              color: '#fff',
+              padding: '4px 12px',
+              fontSize: 12,
+              cursor: 'pointer',
+            }}
+          >
+            完成
+          </button>
+        </div>
+      )}
+      {selectionMode && (
+        <CopyModeOverlay
+          termRef={termRef}
+          themeMode={themeMode}
+        />
+      )}
       <input
         ref={inputRef}
         style={styles.hiddenInput}
@@ -389,14 +521,6 @@ export default function Terminal({ token }: Props) {
         onKeyDown={handleKeyDown}
         aria-hidden="true"
       />
-      <TabBar
-        windows={windows}
-        activeIndex={activeWindowIndex}
-        onSwitch={attachToWindow}
-        onClose={closeWindow}
-        onAdd={openNewSessionDialog}
-        onOpenSettings={() => setShowSettings(true)}
-      />
       <div ref={containerRef} style={styles.terminal} />
       <Toolbar
         token={token}
@@ -405,6 +529,16 @@ export default function Terminal({ token }: Props) {
         termRef={termRef}
         themeMode={themeMode}
         onToggleTheme={toggleTheme}
+        selectionMode={selectionMode}
+        onToggleSelectionMode={() => setSelectionMode(v => !v)}
+        onOpenSettings={() => setShowSettings(true)}
+      />
+      <BottomNav
+        windows={windows}
+        activeIndex={activeWindowIndex}
+        onSwitch={attachToWindow}
+        onClose={closeWindow}
+        onAdd={openNewSessionDialog}
       />
       {showSettings && (
         <SessionManager

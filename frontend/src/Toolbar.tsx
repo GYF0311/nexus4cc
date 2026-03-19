@@ -10,6 +10,9 @@ interface Props {
   termRef: RefObject<Terminal | null>
   themeMode: ThemeMode
   onToggleTheme: () => void
+  selectionMode: boolean
+  onToggleSelectionMode: () => void
+  onOpenSettings?: () => void
 }
 
 const KEY_MAP = Object.fromEntries(ALL_KEYS.map(k => [k.id, k]))
@@ -52,7 +55,7 @@ interface DragState {
 
 const ITEM_HEIGHT = 48 // px，每行编辑项高度
 
-export default function Toolbar({ token, sendToWs, scrollToBottom, themeMode, onToggleTheme }: Props) {
+export default function Toolbar({ token, sendToWs, scrollToBottom, termRef: _termRef, themeMode, onToggleTheme, selectionMode, onToggleSelectionMode, onOpenSettings }: Props) {
   const [config, setConfig]           = useState<ToolbarConfig>(loadConfig)
   const [collapsed, setCollapsed]     = useState(() => localStorage.getItem(COLLAPSED_KEY) === 'true')
   const [editing, setEditing]         = useState(false)
@@ -317,6 +320,18 @@ export default function Toolbar({ token, sendToWs, scrollToBottom, themeMode, on
         <button style={s.iconBtn} onPointerDown={(e) => { e.preventDefault(); onToggleTheme() }}>
           {themeMode === 'dark' ? '☀' : '☾'}
         </button>
+        <button
+          style={selectionMode ? s.copyBtnActive : s.copyBtn}
+          onPointerDown={(e) => { e.preventDefault(); onToggleSelectionMode() }}
+          title={selectionMode ? '退出复制模式' : '进入复制模式'}
+        >
+          {selectionMode ? '完成' : '复制'}
+        </button>
+        {onOpenSettings && (
+          <button style={s.iconBtn} onPointerDown={(e) => { e.preventDefault(); onOpenSettings() }} title="设置">
+            ⚙
+          </button>
+        )}
       </div>
 
       {renderKeys(config.pinned)}
@@ -386,6 +401,28 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: 14,
     padding: '4px 8px',
     borderRadius: 4,
+  },
+  copyBtn: {
+    background: '#0f3460',
+    border: '1px solid #334155',
+    borderRadius: 4,
+    color: '#93c5fd',
+    cursor: 'pointer',
+    fontSize: 12,
+    padding: '4px 10px',
+    marginLeft: 'auto',
+    fontWeight: 500,
+  },
+  copyBtnActive: {
+    background: '#1e3a5f',
+    border: '1px solid #4ade80',
+    borderRadius: 4,
+    color: '#4ade80',
+    cursor: 'pointer',
+    fontSize: 12,
+    padding: '4px 10px',
+    marginLeft: 'auto',
+    fontWeight: 500,
   },
   sessionsBtn: {
     background: 'transparent',
