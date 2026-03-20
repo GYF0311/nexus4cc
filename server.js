@@ -681,7 +681,7 @@ app.post('/api/webhooks/telegram', (req, res) => {
         // 如果有 caption，把 caption 作为 prompt 执行
         if (message.caption?.trim()) {
           const caption = message.caption.trim()
-          runClaudePrompt(caption, cwd, 'telegram')
+          runClaudePrompt(caption, cwd, 'telegram').catch(e => console.error('runClaudePrompt error:', e))
         }
       } catch (e) {
         telegramSend(chatId, '❌ 文件处理失败: ' + (e.message || String(e)))
@@ -725,7 +725,7 @@ app.post('/api/webhooks/telegram', (req, res) => {
     }
   } catch { /* ignore */ }
 
-  runClaudePrompt(text, cwd, sessionName)
+  runClaudePrompt(text, cwd, sessionName).catch(e => console.error('runClaudePrompt error:', e))
 })
 
 // GET /api/telegram/setup — 一键配置 Telegram webhook URL
