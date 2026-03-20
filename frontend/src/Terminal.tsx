@@ -475,6 +475,7 @@ export default function Terminal({ token }: Props) {
   const [windowOutputs, setWindowOutputs] = useState<Record<number, { output: string; clients: number; idleMs: number; connected: boolean }>>({})
   const scrollPositionsRef = useRef<Record<number, number>>({})
   const [showGuide, setShowGuide] = useState(() => localStorage.getItem('nexus_guide_seen') !== 'true')
+  const [isScrolledUp, setIsScrolledUp] = useState(false)
 
   // F-18: 多 tmux session 支持
   const [tmuxSessions, setTmuxSessions] = useState<string[]>([])
@@ -599,6 +600,7 @@ export default function Terminal({ token }: Props) {
   const scrollToBottom = useCallback(() => {
     termRef.current?.scrollToBottom()
     userScrolledRef.current = false
+    setIsScrolledUp(false)
   }, [])
 
   async function fetchWindows() {
@@ -804,6 +806,7 @@ export default function Terminal({ token }: Props) {
   }, [])
 
   useEffect(() => {
+    setIsScrolledUp(false)
     const fontSize = parseInt(localStorage.getItem(FONT_SIZE_KEY) || '16', 10)
     const initialTheme = getInitialTheme()
 
@@ -916,6 +919,16 @@ export default function Terminal({ token }: Props) {
 
     // 键盘输入 → 发送到当前 WebSocket
     term.onData((data) => wsRef.current?.send(data))
+
+    // 滚动位置追踪 → 浮动回底部按钮
+    term.onScroll(() => {
+      const buffer = (term as any).buffer?.active
+      if (buffer) {
+        const scrolledUp = buffer.viewportY < buffer.baseY
+        userScrolledRef.current = scrolledUp
+        setIsScrolledUp(scrolledUp)
+      }
+    })
 
     let touchStartY = 0
     let touchLastY = 0
@@ -1144,6 +1157,9 @@ export default function Terminal({ token }: Props) {
                 <span style={styles.loadingText}>Connecting...</span>
               </div>
             )}
+            {isScrolledUp && (
+              <button style={styles.scrollBtn} onClick={scrollToBottom} title="滚到底部">↓</button>
+            )}
             <Toolbar {...toolbarProps} />
           </div>
         </div>
@@ -1170,6 +1186,9 @@ export default function Terminal({ token }: Props) {
                 <div style={styles.spinner} />
                 <span style={styles.loadingText}>Connecting...</span>
               </div>
+            )}
+            {isScrolledUp && (
+              <button style={styles.scrollBtn} onClick={scrollToBottom} title="滚到底部">↓</button>
             )}
           </div>
           <Toolbar {...toolbarProps} />
@@ -1330,5 +1349,25 @@ const styles: Record<string, React.CSSProperties> = {
   loadingText: {
     color: 'var(--nexus-text2)',
     fontSize: 14,
+  },
+  scrollBtn: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    width: 36,
+    height: 36,
+    borderRadius: '50%',
+    background: 'rgba(59,130,246,0.85)',
+    border: 'none',
+    color: '#fff',
+    fontSize: 18,
+    cursor: 'pointer',
+    zIndex: 50,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+    backdropFilter: 'blur(4px)',
+    WebkitBackdropFilter: 'blur(4px)',
   },
 }
