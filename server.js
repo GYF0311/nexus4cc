@@ -460,18 +460,41 @@ app.post('/api/tasks', authMiddleware, (req, res) => {
 
 // ---- Telegram Bot Webhook (F-16) ----
 
-function telegramSend(chatId, text) {
-  if (!TELEGRAM_BOT_TOKEN) return
-  const body = JSON.stringify({ chat_id: chatId, text, parse_mode: 'Markdown' })
-  const url = new URL(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`)
-  const options = {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
-  }
-  const req = https.request(url, options)
-  req.on('error', (e) => console.error('Telegram sendMessage error:', e.message))
-  req.write(body)
-  req.end()
+function telegramRequest(method, payload) {
+  if (!TELEGRAM_BOT_TOKEN) return Promise.resolve(null)
+  return new Promise((resolve) => {
+    const body = JSON.stringify(payload)
+    const options = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+    }
+    const req = https.request(
+      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/${method}`,
+      options,
+      (res) => {
+        let data = ''
+        res.on('data', d => data += d)
+        res.on('end', () => {
+          try { resolve(JSON.parse(data)) } catch { resolve(null) }
+        })
+      }
+    )
+    req.on('error', (e) => { console.error(`Telegram ${method} error:`, e.message); resolve(null) })
+    req.write(body)
+    req.end()
+  })
+}
+
+// Returns the sent message_id (or null)
+async function telegramSend(chatId, text) {
+  const result = await telegramRequest('sendMessage', { chat_id: chatId, text, parse_mode: 'Markdown' })
+  return result?.result?.message_id ?? null
+}
+
+// Edit an existing message in-place (silently ignores errors)
+function telegramEdit(chatId, messageId, text) {
+  if (!messageId) return
+  telegramRequest('editMessageText', { chat_id: chatId, message_id: messageId, text, parse_mode: 'Markdown' })
 }
 
 // 下载 Telegram 文件到指定目录
@@ -549,9 +572,9 @@ app.post('/api/webhooks/telegram', (req, res) => {
     return
   }
 
-  // 执行 claude -p 的通用函数
-  function runClaudePrompt(prompt, cwd, sessionName) {
-    telegramSend(chatId, `⏳ 正在执行（session: \`${sessionName || 'default'}\`）...`)
+  // 执行 claude -p 的通用函数，支持 Telegram 增量进度更新
+  async function runClaudePrompt(prompt, cwd, sessionName) {
+    const msgId = await telegramSend(chatId, `⏳ *执行中*（session: \`${sessionName || 'default'}\`）\n\n_等待输出..._`)
 
     const proxyEnv = CLAUDE_PROXY ? { ALL_PROXY: CLAUDE_PROXY, HTTPS_PROXY: CLAUDE_PROXY, HTTP_PROXY: CLAUDE_PROXY } : {}
     const child = spawn('claude', ['-p', prompt, '--dangerously-skip-permissions'], {
@@ -566,11 +589,25 @@ app.post('/api/webhooks/telegram', (req, res) => {
     child.stdout.on('data', (data) => { output += data.toString() })
     child.stderr.on('data', (data) => { errorOutput += data.toString() })
 
+    // 每 5 秒更新一次进度消息
+    const progressInterval = setInterval(() => {
+      const preview = (output || errorOutput).trim()
+      if (preview && msgId) {
+        const truncated = preview.length > 3000 ? '…' + preview.slice(-3000) : preview
+        telegramEdit(chatId, msgId, `⏳ *执行中*（session: \`${sessionName || 'default'}\`）\n\`\`\`\n${truncated}\n\`\`\``)
+      }
+    }, 5000)
+
     child.on('close', (code) => {
+      clearInterval(progressInterval)
       const result = output.trim() || errorOutput.trim() || '(无输出)'
       const truncated = result.length > 3800 ? result.slice(0, 3800) + '\n\n…(输出已截断)' : result
       const status = code === 0 ? '✅' : '❌'
-      telegramSend(chatId, `${status} *执行完成*\n\`\`\`\n${truncated}\n\`\`\``)
+      if (msgId) {
+        telegramEdit(chatId, msgId, `${status} *执行完成*（session: \`${sessionName || 'default'}\`）\n\`\`\`\n${truncated}\n\`\`\``)
+      } else {
+        telegramSend(chatId, `${status} *执行完成*\n\`\`\`\n${truncated}\n\`\`\``)
+      }
 
       const tasks = loadTasks()
       tasks.push({
