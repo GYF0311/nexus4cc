@@ -98,22 +98,23 @@ has_session_history() {
 }
 
 # ── 主循环：退出后提示续接 ──
+_force_new=0
 while true; do
-    if has_session_history; then
-        # 有历史，使用 -c 续接
-        claude -c --dangerously-skip-permissions || true
+    if [ $_force_new -eq 0 ] && has_session_history; then
+        # 有历史：尝试 -c 续接；若报 "No conversation found" 则 fallback 新会话
+        claude -c --dangerously-skip-permissions || claude --dangerously-skip-permissions || true
     else
-        # 无历史，创建新会话
+        # 无历史或用户主动选择新会话
         claude --dangerously-skip-permissions || true
     fi
+    _force_new=0
     echo ""
     echo "[Nexus] Claude exited.  r=restart(continue)  n=new session  b=bash shell  q=quit window"
     read -r REPLY
     case "$REPLY" in
-        n) continue ;;  # 不带 -c，开新会话
+        n) _force_new=1 ;;  # 强制新会话，不带 -c
         b) exec bash -i ;;  # 切换到 bash，保持窗口不关闭
-        q) break ;;  # 退出脚本，关闭窗口
-        *) continue ;;  # 默认续接
+        q) break ;;          # 退出脚本，关闭窗口
     esac
 done
 
