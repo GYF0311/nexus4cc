@@ -6,112 +6,20 @@
 
 ## Current Sprint（进行中）
 
-### 多 tmux session 支持（F-18）✅
-**北极星轴**：轴三 — 极致 Agent 管理体验
-**状态**: 已完成
-
-验收标准：
-- [x] `GET /api/tmux-sessions` 列出所有 tmux session
-- [x] `/ws?session=<name>&window=<index>` 连接指定 session 和 window
-- [x] 后端 ptyMap 支持 session:key 格式
-- [x] 前端 session 选择器（Sidebar 下拉）
-- [x] 前端传递 session 参数到所有 API 和 WebSocket
-- [x] session 选择持久化到 localStorage
-
-前置依赖：F-11 ✅
+> 所有核心功能已完成，当前为持续迭代优化阶段。
 
 ---
 
-## Next Sprint（轴二：上下文同步深化）
-
-### 上下文附件同步（F-14）✅ 已完成
-**北极星轴**：轴二
-验收标准：
-- [x] 移动端 Web UI 支持上传图片/文件到指定 session（TabBar 📎 入口）
-- [x] 文件写入 session 对应的 cwd，并自动在终端输入文件路径
-- [x] 支持剪贴板图片直接粘贴（paste from clipboard）
-
-前置依赖：F-13 ✅
-
-### Tab Bar + 移动端底导航（F-09/F-10）✅
-**北极星轴**：轴三 — 极致 Agent 管理体验
-验收标准：
-- [x] Tab Bar 实时反映 tmux window 列表（轮询 2s）
-- [x] 点击 Tab 切换 window，当前活跃 tab 高亮
-- [x] BottomNav 在移动端替代顶部 Tab Bar，支持滑动切换
-- [x] 新建 session 按钮触发 WorkspaceSelector 面板
-
-### 独立 window PTY（F-11）✅
-**北极星轴**：轴三
-验收标准：
-- [x] `ensureWindowPty(windowIndex)` 返回 Map 中独立 PTY 实例
-- [x] WebSocket 路由：`/ws?token=xxx&window=<index>` 连接特定 window
-- [x] 多设备连接不同 window 互不干扰
-- [x] resize 只影响当前 window 的 PTY
-- [x] 空闲 5 分钟后自动清理 PTY 节省资源
-- [x] `GET /api/sessions/:id/output` 获取窗口最后输出
-
-### Agent 状态卡片（F-15）✅
-**北极星轴**：轴三
-验收标准：
-- [x] 「运行中」状态指示器（动态颜色显示在 TabBar、Sidebar）
-- [x] `GET /api/sessions/:id/output` 后端 API 提供各窗口最后 2KB 输出
-- [x] TabBar 悬浮显示窗口最后输出预览（500 字符）
-- [x] 视觉区分「等待输入」(🟡) / 「已退出 shell」(⚪) / 「运行中」(🟢) —— 基于 idleMs + 输出末行启发式分析
-
----
-
-## Backlog（轴二：零摩擦上下文同步）
-
-> 以下功能共同构成「任意时间地点与 AI 交互」的愿景。
-> 设计原则：异步 tasks 与交互 PTY 解耦，共存互不干扰。
-
-### claude -p 非交互派发（F-13）✅
-**北极星轴**：轴二
-验收标准：
-- [x] `POST /api/tasks { session_name, prompt }` → `claude -p` 后台执行
-- [x] SSE 流式返回结果
-- [x] 前端 TaskPanel 展示结果，不占用交互 PTY
-- [x] 任务历史存 `data/tasks.json`
-
-### Telegram Bot 频道（F-16）✅ 后端完成
-**北极星轴**：轴二
-验收标准：
-- [x] `POST /api/webhooks/telegram` 接收消息
-- [x] 调用 `claude -p` 执行，结果回传 Telegram 对话
-- [x] Bot Token 存环境变量 `TELEGRAM_BOT_TOKEN`
-- [x] `GET /api/telegram/setup` 一键注册 webhook URL
-- [x] 任务记录写入 `data/tasks.json`（source: telegram）
-- [ ] 支持发图片/文件附件给指定 session（待 F-14）
-
-前置依赖：F-13（tasks API 稳定）✅
-
-### 上下文附件同步（F-14）
-**北极星轴**：轴二
-验收标准：
-- [ ] 移动端 Web UI 支持上传图片/文件到指定 session
-- [ ] 文件写入 session 对应的 cwd，并自动在终端输入文件路径
-- [ ] 支持剪贴板图片直接粘贴（paste from clipboard）
-
-前置依赖：F-13
+## Backlog（待开发）
 
 ### 多输入渠道统一路由（F-17）
 **北极星轴**：轴二
-说明：Web / Telegram / 未来其他渠道的 prompt 统一进入 task 队列，结果同步回发起方。
-前置依赖：F-16 稳定后提炼通用抽象
-
-### 多 tmux session 支持（F-18）
-**北极星轴**：轴三
-验收标准：
-- [ ] `GET /api/tmux-sessions` 列出所有 tmux session
-- [ ] `/ws?session=<name>&window=<index>` 连接指定 session 和 window
-- [ ] 前端 session 选择器
-
-前置依赖：F-11
+说明：提炼通用 `runTask(prompt, cwd, options)` 抽象，统一 Web / Telegram 调用路径，支持未来扩展新渠道。
+前置依赖：F-16 ✅
 
 ---
 
-## 已完成（v1.3）
+## 已完成
 
 | Feature | Commit |
 |---|---|
@@ -162,8 +70,10 @@
 | TaskPanel 5s 轮询 + Telegram TG 来源标识 | `0854359` |
 | 工具栏新增 ^Z / ^A / ^E 快捷键 | `19e7cb1` |
 | 修复：tasks cwd 路径含冒号解析错误 | `e346c8b` |
+| F-18 多 tmux session 支持 | 本会话 |
 | 修复：/api/tasks 支持多 tmux session（tmux_session 参数）| `aab1aaf` |
 | 修复：窗口切换时滚动位置恢复（userScrolledRef 保持）| `aab1aaf` |
 | Telegram 增量进度更新（editMessageText 每 5 秒）| `053fad6` |
 | 移动端水平滑动切换 tmux 窗口 | `5f33934` |
 | Telegram /switch 命令切换目标窗口 | `6387cdc` |
+| 修复：sanitize /switch target（防命令注入）| `cc9fb01` |
