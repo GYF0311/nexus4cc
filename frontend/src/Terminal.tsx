@@ -1,13 +1,14 @@
-import { useEffect, useRef, useCallback, useState } from 'react'
+import { useEffect, useRef, useCallback, useState, lazy, Suspense } from 'react'
 import { Terminal as XTerm, type ITheme } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import '@xterm/xterm/css/xterm.css'
 import Toolbar from './Toolbar'
 import TabBar from './TabBar'
-import SessionManager from './SessionManager'
-import BottomNav from './BottomNav'
-import WorkspaceSelector from './WorkspaceSelector'
+
+const SessionManager = lazy(() => import('./SessionManager'))
+const WorkspaceSelector = lazy(() => import('./WorkspaceSelector'))
+const TaskPanel = lazy(() => import('./TaskPanel'))
 
 interface TmuxWindow {
   index: number
@@ -172,15 +173,51 @@ function CopyModeOverlay({ termRef, themeMode }: { termRef: React.MutableRefObje
   )
 }
 
-function Sidebar({ windows, activeIndex, onSwitch, onClose, onAdd, onOpenSettings }: {
+function Sidebar({
+  windows,
+  activeIndex,
+  sessions,
+  activeSession,
+  onSwitchSession,
+  onSwitch,
+  onClose,
+  onAdd,
+  onOpenSettings,
+  onOpenTasks,
+  onUpload,
+  onRename,
+}: {
   windows: TmuxWindow[]
   activeIndex: number
+  sessions: string[]
+  activeSession: string
+  onSwitchSession: (session: string) => void
   onSwitch: (index: number) => void
   onClose: (index: number) => void
   onAdd: () => void
   onOpenSettings: () => void
+  onOpenTasks: () => void
+  onUpload: () => void
+  onRename?: (index: number, name: string) => void
 }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
+  const [renameIndex, setRenameIndex] = useState<number | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+  const renameInputRef = useRef<HTMLInputElement>(null)
+
+  function startRename(index: number, currentName: string) {
+    setRenameIndex(index)
+    setRenameValue(currentName)
+    setTimeout(() => renameInputRef.current?.focus(), 50)
+  }
+
+  function submitRename() {
+    if (renameIndex !== null && renameValue.trim() && onRename) {
+      onRename(renameIndex, renameValue.trim())
+    }
+    setRenameIndex(null)
+    setRenameValue('')
+  }
 
   return (
     <div style={{
@@ -192,6 +229,31 @@ function Sidebar({ windows, activeIndex, onSwitch, onClose, onAdd, onOpenSetting
       flexDirection: 'column',
       height: '100%',
     }}>
+      {/* Session Selector */}
+      <div style={{
+        padding: '8px 12px',
+        borderBottom: '1px solid var(--nexus-border)',
+      }}>
+        <div style={{ color: 'var(--nexus-muted)', fontSize: 11, marginBottom: 4 }}>Session</div>
+        <select
+          value={activeSession}
+          onChange={(e) => onSwitchSession(e.target.value)}
+          style={{
+            width: '100%',
+            background: 'var(--nexus-bg2)',
+            border: '1px solid var(--nexus-border)',
+            borderRadius: 6,
+            color: 'var(--nexus-text)',
+            fontSize: 13,
+            padding: '6px 8px',
+            cursor: 'pointer',
+          }}
+        >
+          {sessions.map(s => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+      </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
         {windows.map(win => (
           <div
@@ -220,23 +282,80 @@ function Sidebar({ windows, activeIndex, onSwitch, onClose, onAdd, onOpenSetting
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
               fontWeight: win.index === activeIndex ? 500 : 400,
-            }}><span style={{ color: 'var(--nexus-muted)', marginRight: 6 }}>{win.index}:</span>{win.name}</span>
-            {hoveredIndex === win.index && (
-              <button
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#ef4444',
-                  cursor: 'pointer',
-                  fontSize: 14,
-                  padding: '0 2px',
-                  flexShrink: 0,
-                  opacity: 0.7,
-                  lineHeight: 1,
-                }}
-                onClick={(e) => { e.stopPropagation(); onClose(win.index) }}
-                title="关闭"
-              >×</button>
+            }}>
+              {renameIndex === win.index ? (
+                <input
+                  ref={renameInputRef}
+                  value={renameValue}
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') submitRename()
+                    if (e.key === 'Escape') { setRenameIndex(null); setRenameValue('') }
+                  }}
+                  onBlur={submitRename}
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    background: 'var(--nexus-bg)',
+                    border: '1px solid var(--nexus-border)',
+                    borderRadius: 4,
+                    color: 'var(--nexus-text)',
+                    fontSize: 13,
+                    fontFamily: 'Menlo, Monaco, "Cascadia Code", monospace',
+                    padding: '2px 6px',
+                    flex: 1,
+                    outline: 'none',
+                  }}
+                />
+              ) : (
+                <>
+                  <span style={{ color: 'var(--nexus-muted)', marginRight: 6 }}>{win.index}:</span>
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{win.name}</span>
+                </>
+              )}
+            </span>
+            {win.active && renameIndex !== win.index && (
+              <span style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: '#22c55e',
+                flexShrink: 0,
+                marginRight: 4,
+              }} title="运行中" />
+            )}
+            {hoveredIndex === win.index && renameIndex !== win.index && (
+              <>
+                <button
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--nexus-text2)',
+                    cursor: 'pointer',
+                    fontSize: 12,
+                    padding: '0 4px',
+                    flexShrink: 0,
+                    opacity: 0.7,
+                    lineHeight: 1,
+                  }}
+                  onClick={(e) => { e.stopPropagation(); startRename(win.index, win.name) }}
+                  title="重命名"
+                >✎</button>
+                <button
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#ef4444',
+                    cursor: 'pointer',
+                    fontSize: 14,
+                    padding: '0 2px',
+                    flexShrink: 0,
+                    opacity: 0.7,
+                    lineHeight: 1,
+                  }}
+                  onClick={(e) => { e.stopPropagation(); onClose(win.index) }}
+                  title="关闭"
+                >×</button>
+              </>
             )}
           </div>
         ))}
@@ -275,6 +394,34 @@ function Sidebar({ windows, activeIndex, onSwitch, onClose, onAdd, onOpenSetting
             width: '100%',
             textAlign: 'left',
           }}
+          onClick={onOpenTasks}
+        >📋 任务面板</button>
+        <button
+          style={{
+            background: 'transparent',
+            border: '1px solid var(--nexus-border)',
+            borderRadius: 6,
+            color: 'var(--nexus-text2)',
+            cursor: 'pointer',
+            fontSize: 13,
+            padding: '7px 12px',
+            width: '100%',
+            textAlign: 'left',
+          }}
+          onClick={onUpload}
+        >📎 上传文件</button>
+        <button
+          style={{
+            background: 'transparent',
+            border: '1px solid var(--nexus-border)',
+            borderRadius: 6,
+            color: 'var(--nexus-text2)',
+            cursor: 'pointer',
+            fontSize: 13,
+            padding: '7px 12px',
+            width: '100%',
+            textAlign: 'left',
+          }}
           onClick={onOpenSettings}
         >⚙ 配置管理</button>
       </div>
@@ -296,12 +443,55 @@ export default function Terminal({ token }: Props) {
   const [selectionMode, setSelectionMode] = useState(false)
   const selectionModeRef = useRef(selectionMode)
   selectionModeRef.current = selectionMode
-  const [isWidePC, setIsWidePC] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1024)
-  const [isConnecting, setIsConnecting] = useState(true)
+  const [isWidePC, setIsWidePC] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 768)
+  const [isConnecting, setIsConnecting] = useState(false)
+  const hasConnectedRef = useRef(false)
+  const [showTasks, setShowTasks] = useState(false)
   const pausePollingRef = useRef(false)
+  const activeWindowIndexRef = useRef(0)
+  const windowsInitializedRef = useRef(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const uploadFileRef = useRef<(file: File) => Promise<void>>(null!)
+  const [, setWindowOutputs] = useState<Record<number, { output: string; clients: number; idleMs: number }>>({})
+  const scrollPositionsRef = useRef<Record<number, number>>({})
+  const [showGuide, setShowGuide] = useState(() => localStorage.getItem('nexus_guide_seen') !== 'true')
+
+  // F-18: 多 tmux session 支持
+  const [tmuxSessions, setTmuxSessions] = useState<string[]>([])
+  const [activeTmuxSession, setActiveTmuxSession] = useState<string>(() => localStorage.getItem('nexus_session') || 'main')
+  const activeTmuxSessionRef = useRef(activeTmuxSession)
+  activeTmuxSessionRef.current = activeTmuxSession
+
+  // 加载服务端默认 session
+  useEffect(() => {
+    fetch('/api/config', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(d => {
+        if (d.tmuxSession && !localStorage.getItem('nexus_session')) {
+          setActiveTmuxSession(d.tmuxSession)
+        }
+      })
+      .catch(() => {})
+  }, [token])
+
+  // 获取所有 tmux sessions
+  useEffect(() => {
+    const fetchSessions = async () => {
+      try {
+        const r = await fetch('/api/tmux-sessions', { headers: { Authorization: `Bearer ${token}` } })
+        if (r.ok) {
+          const sessions = await r.json()
+          setTmuxSessions(sessions.map((s: any) => s.name))
+        }
+      } catch {}
+    }
+    fetchSessions()
+    const interval = setInterval(fetchSessions, 10000)
+    return () => clearInterval(interval)
+  }, [token])
 
   useEffect(() => {
-    const check = () => setIsWidePC(window.innerWidth >= 1024)
+    const check = () => setIsWidePC(window.innerWidth >= 768)
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
   }, [])
@@ -346,11 +536,28 @@ export default function Terminal({ token }: Props) {
 
   // 定期刷新窗口列表（每 2 秒），保持与 tmux 同步
   useEffect(() => {
+    fetchWindows() // 初始立即加载
     const interval = setInterval(() => {
       if (!pausePollingRef.current) fetchWindows()
     }, 2000)
     return () => clearInterval(interval)
   }, [])
+
+  // 轮询各窗口输出（F-15 状态卡片）
+  useEffect(() => {
+    async function fetchOutputs() {
+      const outputs: Record<number, any> = {}
+      for (const win of windows) {
+        try {
+          const r = await fetch(`/api/sessions/${win.index}/output`, { headers: { Authorization: `Bearer ${token}` } })
+          if (r.ok) outputs[win.index] = await r.json()
+        } catch {}
+      }
+      setWindowOutputs(outputs)
+    }
+    const interval = setInterval(fetchOutputs, 3000)
+    return () => clearInterval(interval)
+  }, [windows.length, token])
 
   const scrollToBottom = useCallback(() => {
     termRef.current?.scrollToBottom()
@@ -359,21 +566,37 @@ export default function Terminal({ token }: Props) {
 
   async function fetchWindows() {
     try {
-      const r = await fetch('/api/sessions', { headers: { Authorization: `Bearer ${token}` } })
+      const session = activeTmuxSessionRef.current
+      const r = await fetch(`/api/sessions?session=${encodeURIComponent(session)}`, { headers: { Authorization: `Bearer ${token}` } })
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
       const d = await r.json()
       const wins = d.windows ?? []
       setWindows(wins)
-      const active = wins.find((w: TmuxWindow) => w.active)
-      if (active) setActiveWindowIndex(active.index)
+      // 首次加载：同步到 tmux 当前活跃窗口
+      // 后续轮询：只有当前窗口消失时才 fallback，避免反复重连 WebSocket
+      const currentStillExists = wins.some((w: TmuxWindow) => w.index === activeWindowIndexRef.current)
+      if (!windowsInitializedRef.current || !currentStillExists) {
+        windowsInitializedRef.current = true
+        const active = wins.find((w: TmuxWindow) => w.active)
+        if (active) setActiveWindowIndex(active.index)
+      }
     } catch {
       // ignore
     }
   }
 
   async function attachToWindow(index: number) {
+    // 保存当前窗口的滚动位置
+    if (termRef.current && activeWindowIndex !== index) {
+      const buffer = (termRef.current as any).buffer
+      if (buffer?.active) {
+        scrollPositionsRef.current[activeWindowIndex] = buffer.active.viewportY
+      }
+    }
+
     try {
-      const r = await fetch(`/api/sessions/${index}/attach`, {
+      const session = activeTmuxSessionRef.current
+      const r = await fetch(`/api/sessions/${index}/attach?session=${encodeURIComponent(session)}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       })
@@ -382,6 +605,13 @@ export default function Terminal({ token }: Props) {
         // 暂停轮询 3 秒，避免 optimistic 状态被覆盖
         pausePollingRef.current = true
         setTimeout(() => { pausePollingRef.current = false }, 3000)
+        // 恢复目标窗口的滚动位置（延迟等待 WebSocket 连接和数据渲染）
+        setTimeout(() => {
+          const savedY = scrollPositionsRef.current[index]
+          if (savedY !== undefined && termRef.current) {
+            termRef.current.scrollLines(savedY - (termRef.current as any).buffer.active.viewportY)
+          }
+        }, 500)
       }
     } catch {
       // ignore
@@ -390,7 +620,8 @@ export default function Terminal({ token }: Props) {
 
   async function closeWindow(index: number) {
     try {
-      const r = await fetch(`/api/sessions/${index}`, {
+      const session = activeTmuxSessionRef.current
+      const r = await fetch(`/api/sessions/${index}?session=${encodeURIComponent(session)}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       })
@@ -402,12 +633,29 @@ export default function Terminal({ token }: Props) {
     }
   }
 
+  async function renameWindow(index: number, name: string) {
+    try {
+      const session = activeTmuxSessionRef.current
+      const r = await fetch(`/api/sessions/${index}/rename?session=${encodeURIComponent(session)}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      })
+      if (r.ok) {
+        await fetchWindows()
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   async function createSession(relPath: string, shellType: 'claude' | 'bash' = 'claude', profile?: string) {
     try {
+      const session = activeTmuxSessionRef.current
       const r = await fetch('/api/sessions', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rel_path: relPath, shell_type: shellType, profile }),
+        body: JSON.stringify({ rel_path: relPath, shell_type: shellType, profile, session }),
       })
       if (r.ok) {
         // 等待一小段时间让 tmux 创建窗口，然后刷新列表
@@ -427,6 +675,74 @@ export default function Terminal({ token }: Props) {
     setShowNewSession(false)
     createSession(path, shellType, profile)
   }
+
+  function handleSwitchSession(newSession: string) {
+    localStorage.setItem('nexus_session', newSession)
+    setActiveTmuxSession(newSession)
+    // 重置窗口状态
+    setWindows([])
+    setActiveWindowIndex(0)
+    windowsInitializedRef.current = false
+    // 重新获取窗口列表
+    setTimeout(() => fetchWindows(), 100)
+  }
+
+  function handleFileUpload() {
+    fileInputRef.current?.click()
+  }
+
+  async function uploadFile(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+    const activeWindow = windows.find(w => w.index === activeWindowIndex)
+    if (activeWindow) {
+      formData.append('session_name', activeWindow.name)
+    }
+    try {
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      })
+      if (!res.ok) throw new Error(await res.text())
+      const data = await res.json()
+      // 在终端中输入文件路径
+      const path = data.path
+      if (path) {
+        // 输入文件路径到终端（带引号处理空格）
+        const needsQuotes = path.includes(' ')
+        const displayPath = needsQuotes ? `"${path}"` : path
+        sendToWs(displayPath)
+      }
+    } catch (e: any) {
+      console.error('Upload failed:', e)
+    }
+  }
+
+  // Keep refs current on every render
+  uploadFileRef.current = uploadFile
+  activeWindowIndexRef.current = activeWindowIndex
+
+  // 全局剪贴板粘贴：图片直接上传（F-14）
+  useEffect(() => {
+    function handlePaste(e: ClipboardEvent) {
+      const target = e.target as HTMLElement
+      // 不拦截文本输入框里的粘贴
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return
+      const items = e.clipboardData?.items
+      if (!items) return
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.startsWith('image/')) {
+          e.preventDefault()
+          const file = items[i].getAsFile()
+          if (file) uploadFileRef.current(file)
+          return
+        }
+      }
+    }
+    document.addEventListener('paste', handlePaste)
+    return () => document.removeEventListener('paste', handlePaste)
+  }, [])
 
   useEffect(() => {
     const fontSize = parseInt(localStorage.getItem(FONT_SIZE_KEY) || '16', 10)
@@ -480,14 +796,27 @@ export default function Terminal({ token }: Props) {
     }
 
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const ws = new WebSocket(`${protocol}//${location.host}/ws?token=${encodeURIComponent(token)}`)
+    const session = activeTmuxSessionRef.current
+
+    // 延迟显示 loading，避免快速连接时的闪烁
+    const loadingTimer = setTimeout(() => {
+      if (!hasConnectedRef.current) setIsConnecting(true)
+    }, 300)
+
+    // 标记是否为主动关闭（useEffect cleanup），避免触发重连
+    let intentionalClose = false
+
+    const ws = new WebSocket(`${protocol}//${location.host}/ws?token=${encodeURIComponent(token)}&window=${activeWindowIndex}&session=${encodeURIComponent(session)}`)
     wsRef.current = ws
 
     ws.onopen = () => {
+      clearTimeout(loadingTimer)
+      hasConnectedRef.current = true
       setIsConnecting(false)
       fitAddon.fit()
       ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
-      fetchWindows()
+      // Note: 不在此处调用 fetchWindows，避免 ws.onopen -> setState -> useEffect cleanup 循环
+      // fetchWindows 由轮询（2秒）处理
     }
 
     ws.onmessage = (e) => {
@@ -495,12 +824,30 @@ export default function Terminal({ token }: Props) {
       if (!userScrolledRef.current) term.scrollToBottom()
     }
 
+    // 重连逻辑
+    let reconnectAttempts = 0
+    const maxReconnectAttempts = 5
+    const reconnectDelay = () => Math.min(1000 * Math.pow(2, reconnectAttempts), 10000)
+
+    function tryReconnect() {
+      if (reconnectAttempts >= maxReconnectAttempts) {
+        term.write('\r\n\x1b[31m[Nexus: 重连失败，请刷新页面]\x1b[0m\r\n')
+        return
+      }
+      reconnectAttempts++
+      term.write(`\r\n\x1b[33m[Nexus: 连接断开，${reconnectDelay() / 1000}s 后重连 (${reconnectAttempts}/${maxReconnectAttempts})...]\x1b[0m\r\n`)
+      setTimeout(() => {
+        // 触发重新初始化 WebSocket 需要重新执行 useEffect，这里简单刷新
+        location.reload()
+      }, reconnectDelay())
+    }
+
     ws.onclose = (e) => {
+      if (intentionalClose) return
       if (e.code === 4001) {
         term.write('\r\n\x1b[31m[Nexus: 认证失败，请刷新重新登录]\x1b[0m\r\n')
       } else {
-        term.write('\r\n\x1b[33m[Nexus: 连接断开，正在重连...]\x1b[0m\r\n')
-        setTimeout(() => location.reload(), 3000)
+        tryReconnect()
       }
     }
 
@@ -606,6 +953,8 @@ export default function Terminal({ token }: Props) {
     window.addEventListener('orientationchange', onOrientationChange)
 
     return () => {
+      intentionalClose = true
+      clearTimeout(loadingTimer)
       resizeObserver.disconnect()
       window.removeEventListener('orientationchange', onOrientationChange)
       container.removeEventListener('touchstart', onTouchStart)
@@ -614,7 +963,7 @@ export default function Terminal({ token }: Props) {
       ws.close()
       term.dispose()
     }
-  }, [token])
+  }, [token, activeWindowIndex])
 
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     const val = e.target.value
@@ -696,19 +1045,36 @@ export default function Terminal({ token }: Props) {
         onKeyDown={handleKeyDown}
         aria-hidden="true"
       />
+      <input
+        ref={fileInputRef}
+        type="file"
+        style={styles.hiddenInput}
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) uploadFile(file)
+          e.target.value = '' // reset
+        }}
+        aria-hidden="true"
+      />
 
       {isWidePC ? (
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
           <Sidebar
             windows={windows}
             activeIndex={activeWindowIndex}
+            sessions={tmuxSessions}
+            activeSession={activeTmuxSession}
+            onSwitchSession={handleSwitchSession}
             onSwitch={attachToWindow}
             onClose={closeWindow}
             onAdd={openNewSessionDialog}
             onOpenSettings={() => setShowSettings(true)}
+            onOpenTasks={() => setShowTasks(true)}
+            onUpload={handleFileUpload}
+            onRename={renameWindow}
           />
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, position: 'relative' }}>
-            <div ref={containerRef} style={styles.terminal} />
+            <div ref={containerRef} style={styles.terminal} onClick={() => inputRef.current?.focus()} />
             {isConnecting && (
               <div style={styles.loadingOverlay}>
                 <div style={styles.spinner} />
@@ -719,7 +1085,7 @@ export default function Terminal({ token }: Props) {
           </div>
         </div>
       ) : (
-        <>
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', minHeight: 0 }}>
           <TabBar
             windows={windows}
             activeIndex={activeWindowIndex}
@@ -727,9 +1093,12 @@ export default function Terminal({ token }: Props) {
             onClose={closeWindow}
             onAdd={openNewSessionDialog}
             onOpenSettings={() => setShowSettings(true)}
+            onUpload={handleFileUpload}
+            onRename={renameWindow}
+            token={token}
           />
-          <div style={{ flex: 1, position: 'relative' }}>
-            <div ref={containerRef} style={styles.terminal} />
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', position: 'relative' }}>
+            <div ref={containerRef} style={styles.terminal} onClick={() => inputRef.current?.focus()} />
             {isConnecting && (
               <div style={styles.loadingOverlay}>
                 <div style={styles.spinner} />
@@ -738,28 +1107,109 @@ export default function Terminal({ token }: Props) {
             )}
           </div>
           <Toolbar {...toolbarProps} />
-          <BottomNav
-            windows={windows}
-            activeIndex={activeWindowIndex}
-            onSwitch={attachToWindow}
-            onClose={closeWindow}
-            onAdd={openNewSessionDialog}
-          />
-        </>
+        </div>
       )}
 
+      {showTasks && (
+        <Suspense fallback={null}>
+          <TaskPanel
+            token={token}
+            windows={windows}
+            activeWindowName={windows.find(w => w.index === activeWindowIndex)?.name || ''}
+            onClose={() => setShowTasks(false)}
+          />
+        </Suspense>
+      )}
       {showSettings && (
-        <SessionManager
-          token={token}
-          onClose={() => setShowSettings(false)}
-        />
+        <Suspense fallback={null}>
+          <SessionManager
+            token={token}
+            onClose={() => setShowSettings(false)}
+          />
+        </Suspense>
       )}
       {showNewSession && (
-        <WorkspaceSelector
-          token={token}
-          onClose={() => setShowNewSession(false)}
-          onConfirm={handleCreateSession}
-        />
+        <Suspense fallback={null}>
+          <WorkspaceSelector
+            token={token}
+            onClose={() => setShowNewSession(false)}
+            onConfirm={handleCreateSession}
+          />
+        </Suspense>
+      )}
+
+      {/* 首次使用引导 */}
+      {showGuide && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.7)',
+          zIndex: 500,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 20,
+        }}>
+          <div style={{
+            background: 'var(--nexus-menu-bg)',
+            borderRadius: 12,
+            padding: '24px',
+            maxWidth: 400,
+            border: '1px solid var(--nexus-border)',
+          }}>
+            <h3 style={{ color: 'var(--nexus-text)', marginTop: 0 }}>欢迎使用 Nexus</h3>
+            <p style={{ color: 'var(--nexus-text2)', lineHeight: 1.6, fontSize: 14 }}>
+              Nexus 是 AI Agent 终端面板，黑色区域是终端模拟器，用于：
+            </p>
+            <ul style={{ color: 'var(--nexus-text2)', lineHeight: 1.8, fontSize: 13, paddingLeft: 20 }}>
+              <li>与 Claude Code 交互</li>
+              <li>查看命令行输出</li>
+              <li>编辑文件（Vim/Nano）</li>
+            </ul>
+            <p style={{ color: 'var(--nexus-muted)', fontSize: 12, marginTop: 16 }}>
+              提示：点击终端区域聚焦输入，底部工具栏提供常用快捷键
+            </p>
+            <button
+              onClick={() => {
+                setShowGuide(false)
+                localStorage.setItem('nexus_guide_seen', 'true')
+              }}
+              style={{
+                background: '#3b82f6',
+                border: 'none',
+                borderRadius: 6,
+                color: '#fff',
+                cursor: 'pointer',
+                fontSize: 14,
+                fontWeight: 600,
+                padding: '10px 20px',
+                marginTop: 12,
+                width: '100%',
+              }}
+            >
+              开始使用
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 空状态提示 */}
+      {windows.length === 0 && !isConnecting && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          textAlign: 'center',
+          color: 'var(--nexus-muted)',
+        }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>🖥️</div>
+          <div style={{ fontSize: 16, marginBottom: 8 }}>没有活动会话</div>
+          <div style={{ fontSize: 13 }}>点击「+ 新建会话」开始</div>
+        </div>
       )}
     </div>
   )
