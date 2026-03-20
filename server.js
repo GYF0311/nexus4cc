@@ -377,11 +377,11 @@ function updateTask(id, updates) {
  * F-17: 统一任务执行入口 — spawn claude -p, 管理任务记录, 回调给各渠道
  * @param {string} prompt
  * @param {string} cwd
- * @param {{ sessionName?: string, source?: string, tmuxSession?: string, onChunk?: (chunk:string,isErr:boolean)=>void, onDone?: (result:object)=>void }} opts
+ * @param {{ sessionName?: string, source?: string, tmuxSession?: string, profile?: string, onChunk?: (chunk:string,isErr:boolean)=>void, onDone?: (result:object)=>void }} opts
  * @returns {string} taskId
  */
 function runTask(prompt, cwd, opts = {}) {
-  const { sessionName, source = 'web', tmuxSession, onChunk, onDone } = opts
+  const { sessionName, source = 'web', tmuxSession, profile, onChunk, onDone } = opts
   const taskId = `task_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
   const createdAt = new Date().toISOString()
 
@@ -401,7 +401,9 @@ function runTask(prompt, cwd, opts = {}) {
   saveTasks(allTasks)
 
   const proxyEnv = CLAUDE_PROXY ? { ALL_PROXY: CLAUDE_PROXY, HTTPS_PROXY: CLAUDE_PROXY, HTTP_PROXY: CLAUDE_PROXY } : {}
-  const child = spawn('claude', ['-p', prompt, '--dangerously-skip-permissions'], {
+  const claudeArgs = ['-p', prompt, '--dangerously-skip-permissions']
+  if (profile) claudeArgs.push('--profile', profile)
+  const child = spawn('claude', claudeArgs, {
     cwd,
     env: { ...process.env, ...proxyEnv },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -452,7 +454,7 @@ app.delete('/api/tasks/:id', authMiddleware, (req, res) => {
 
 // POST /api/tasks — 创建新任务，SSE 流式返回
 app.post('/api/tasks', authMiddleware, (req, res) => {
-  const { session_name, prompt, tmux_session } = req.body || {}
+  const { session_name, prompt, profile, tmux_session } = req.body || {}
   if (!prompt) return res.status(400).json({ error: 'prompt required' })
 
   // 找到 session 对应的 cwd
@@ -478,6 +480,7 @@ app.post('/api/tasks', authMiddleware, (req, res) => {
     sessionName: session_name,
     source: 'web',
     tmuxSession: targetSession,
+    profile,
     onChunk: (chunk, isErr) => {
       const ev = isErr ? 'error' : 'output'
       res.write(`event: ${ev}\ndata: ${JSON.stringify({ chunk })}\n\n`)

@@ -91,6 +91,7 @@ export default function TaskPanel({ token, windows, activeWindowName, tmuxSessio
       const reader = r.body.getReader()
       const decoder = new TextDecoder()
       let buf = ''
+      let fullOutput = ''
 
       while (true) {
         const { done, value } = await reader.read()
@@ -103,11 +104,22 @@ export default function TaskPanel({ token, windows, activeWindowName, tmuxSessio
             try {
               const ev = JSON.parse(line.slice(6))
               if (ev.chunk !== undefined) {
+                fullOutput += ev.chunk
                 setStreamOutput(prev => prev + ev.chunk)
               }
             } catch { /* ignore */ }
           }
         }
+      }
+
+      // 任务完成后推送浏览器通知（当标签页不在前台时）
+      if (!document.hasFocus() && 'Notification' in window && Notification.permission === 'granted') {
+        // 取输出最后一个有内容的行作为通知摘要
+        const lastLine = fullOutput.trim().split('\n').filter(l => l.trim()).pop() || prompt.trim()
+        new Notification('Nexus: 任务完成', {
+          body: lastLine.slice(0, 100),
+          icon: '/icon.svg',
+        })
       }
     } catch (e: any) {
       if (e.name !== 'AbortError') {
@@ -119,13 +131,6 @@ export default function TaskPanel({ token, windows, activeWindowName, tmuxSessio
     setIsRunning(false)
     setPrompt('')
     fetchTasks()
-    // 任务完成后推送浏览器通知（当标签页不在前台时）
-    if (!document.hasFocus() && 'Notification' in window && Notification.permission === 'granted') {
-      new Notification('Nexus: 任务完成', {
-        body: prompt.trim().slice(0, 80),
-        icon: '/icons/icon-192.png',
-      })
-    }
   }
 
   // Keep selectedTask fresh with latest data from polling
