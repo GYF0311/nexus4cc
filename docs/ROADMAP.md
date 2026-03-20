@@ -12,10 +12,7 @@
 
 ## Backlog（待开发）
 
-### 多输入渠道统一路由（F-17）
-**北极星轴**：轴二
-说明：提炼通用 `runTask(prompt, cwd, options)` 抽象，统一 Web / Telegram 调用路径，支持未来扩展新渠道。
-前置依赖：F-16 ✅
+> 所有计划功能已完成，无待开发项目。如有新需求请对照 NORTH-STAR 三轴添加。
 
 ---
 
@@ -87,3 +84,5 @@
 | fix(tasks): TaskPanel 首次打开时申请浏览器通知权限 | `667fc8f` |
 | feat(ui): 页面标题显示运行中任务数量 `(N)` | `524c9fa` |
 | fix: tasks.json 上限 200 条；窗口输出轮询加 session 参数 | `8cf0aba` |
+| refactor: 抽取 windowStatus.ts，消除 Terminal/TabBar 重复定义 | `044c542` |
+| F-17: 统一 runTask() 抽象（Web + Telegram 共享执行入口） | `605b057` |
