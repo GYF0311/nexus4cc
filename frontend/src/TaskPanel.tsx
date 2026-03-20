@@ -50,6 +50,15 @@ export default function TaskPanel({ token, windows, activeWindowName, tmuxSessio
     } catch { /* ignore */ }
   }
 
+  async function deleteTask(id: string, e: React.MouseEvent) {
+    e.stopPropagation()
+    try {
+      await fetch(`/api/tasks/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
+      setTasks(prev => prev.filter(t => t.id !== id))
+      if (selectedTask?.id === id) setSelectedTask(null)
+    } catch { /* ignore */ }
+  }
+
   async function runTask() {
     if (!prompt.trim() || isRunning) return
     setIsRunning(true)
@@ -208,6 +217,7 @@ export default function TaskPanel({ token, windows, activeWindowName, tmuxSessio
                     <span style={s.taskPrompt}>{task.prompt.slice(0, 60)}{task.prompt.length > 60 ? '...' : ''}</span>
                     {task.source === 'telegram' && <span style={s.sourceBadge}>TG</span>}
                     <span style={s.taskSession}>{task.session_name}</span>
+                    <button style={s.deleteBtn} onClick={(e) => deleteTask(task.id, e)} title="删除">✕</button>
                   </div>
                 ))}
               </div>
@@ -439,5 +449,16 @@ const s: Record<string, React.CSSProperties> = {
     borderRadius: 3,
     flexShrink: 0,
     letterSpacing: 0.5,
+  },
+  deleteBtn: {
+    background: 'transparent',
+    border: 'none',
+    color: 'var(--nexus-muted)',
+    cursor: 'pointer',
+    fontSize: 11,
+    padding: '0 2px',
+    flexShrink: 0,
+    lineHeight: 1,
+    opacity: 0.6,
   },
 }

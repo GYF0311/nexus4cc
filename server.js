@@ -375,6 +375,14 @@ app.get('/api/tasks', authMiddleware, (req, res) => {
   res.json(tasks.slice(-50).reverse()) // 最近50条，倒序
 })
 
+// DELETE /api/tasks/:id — 删除单条任务记录
+app.delete('/api/tasks/:id', authMiddleware, (req, res) => {
+  const tasks = loadTasks()
+  const filtered = tasks.filter(t => t.id !== req.params.id)
+  saveTasks(filtered)
+  res.json({ ok: true })
+})
+
 // POST /api/tasks — 创建新任务，SSE 流式返回
 app.post('/api/tasks', authMiddleware, (req, res) => {
   const { session_name, prompt, profile, tmux_session } = req.body || {}
@@ -932,6 +940,21 @@ wss.on('connection', (ws, req) => {
     if (ent) { ent.clients.delete(ws); ent.clientSizes.delete(ws); }
   });
 });
+
+// 启动时清理残留的 running 状态（服务重启导致的孤儿任务）
+try {
+  const staleTasks = loadTasks()
+  let changed = false
+  for (const t of staleTasks) {
+    if (t.status === 'running') {
+      t.status = 'error'
+      t.error = '(服务重启，任务中断)'
+      t.completedAt = new Date().toISOString()
+      changed = true
+    }
+  }
+  if (changed) saveTasks(staleTasks)
+} catch {}
 
 server.listen(Number(PORT), '0.0.0.0', () => {
   console.log(`Nexus listening on :${PORT}`);
