@@ -100,21 +100,21 @@ app.post('/api/sessions', authMiddleware, (req, res) => {
   const cwd = rel_path.startsWith('/') ? rel_path : `${WORKSPACE_ROOT}/${rel_path}`;
   const name = cwd.replace(/^\/+|\/+$/g, '').replace(/\//g, '-') || 'session';
 
+  // 收集代理变量（宿主机环境 + CLAUDE_PROXY 覆盖）
+  const proxyVars = {
+    ...(process.env.HTTP_PROXY  ? { HTTP_PROXY:  process.env.HTTP_PROXY  } : {}),
+    ...(process.env.HTTPS_PROXY ? { HTTPS_PROXY: process.env.HTTPS_PROXY } : {}),
+    ...(process.env.ALL_PROXY   ? { ALL_PROXY:   process.env.ALL_PROXY   } : {}),
+    ...(process.env.http_proxy  ? { http_proxy:  process.env.http_proxy  } : {}),
+    ...(process.env.https_proxy ? { https_proxy: process.env.https_proxy } : {}),
+    ...(CLAUDE_PROXY ? { ALL_PROXY: CLAUDE_PROXY, HTTPS_PROXY: CLAUDE_PROXY, HTTP_PROXY: CLAUDE_PROXY } : {}),
+  };
+
   let shellCmd;
   if (shell_type === 'bash') {
     shellCmd = 'zsh';
   } else {
     // claude mode: inject proxy env vars so claude can reach the API
-    // 合并宿主机代理变量和 CLAUDE_PROXY（CLAUDE_PROXY 优先级最高）
-    const proxyVars = {
-      ...(process.env.HTTP_PROXY  ? { HTTP_PROXY:  process.env.HTTP_PROXY  } : {}),
-      ...(process.env.HTTPS_PROXY ? { HTTPS_PROXY: process.env.HTTPS_PROXY } : {}),
-      ...(process.env.ALL_PROXY   ? { ALL_PROXY:   process.env.ALL_PROXY   } : {}),
-      ...(process.env.http_proxy  ? { http_proxy:  process.env.http_proxy  } : {}),
-      ...(process.env.https_proxy ? { https_proxy: process.env.https_proxy } : {}),
-      // CLAUDE_PROXY 覆盖所有
-      ...(CLAUDE_PROXY ? { ALL_PROXY: CLAUDE_PROXY, HTTPS_PROXY: CLAUDE_PROXY, HTTP_PROXY: CLAUDE_PROXY } : {}),
-    };
     const proxyEnv = Object.entries(proxyVars).map(([k, v]) => `${k}=${v}`).join(' ');
     if (profile) {
       const runScript = join(__dirname, 'nexus-run-claude.sh');
@@ -128,6 +128,13 @@ app.post('/api/sessions', authMiddleware, (req, res) => {
   try {
     execSync(`tmux has-session -t ${tmuxSession} 2>/dev/null || tmux new-session -d -s ${tmuxSession} -n shell "zsh"`);
   } catch {}
+
+  // 将代理变量设置到 tmux session 环境，新窗口才能继承
+  for (const [key, value] of Object.entries(proxyVars)) {
+    try {
+      execSync(`tmux set-environment -t ${tmuxSession} ${key} "${value}" 2>/dev/null`);
+    } catch {}
+  }
 
   const cmd = `tmux new-window -t ${tmuxSession} -c "${cwd}" -n "${name}" "${shellCmd}"`;
   exec(cmd, (err) => {
