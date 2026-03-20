@@ -796,7 +796,6 @@ export default function Terminal({ token }: Props) {
     }
 
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const session = activeTmuxSessionRef.current
 
     // 延迟显示 loading，避免快速连接时的闪烁
     const loadingTimer = setTimeout(() => {
@@ -806,54 +805,58 @@ export default function Terminal({ token }: Props) {
     // 标记是否为主动关闭（useEffect cleanup），避免触发重连
     let intentionalClose = false
 
-    const ws = new WebSocket(`${protocol}//${location.host}/ws?token=${encodeURIComponent(token)}&window=${activeWindowIndex}&session=${encodeURIComponent(session)}`)
-    wsRef.current = ws
-
-    ws.onopen = () => {
-      clearTimeout(loadingTimer)
-      hasConnectedRef.current = true
-      setIsConnecting(false)
-      fitAddon.fit()
-      ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
-      // Note: 不在此处调用 fetchWindows，避免 ws.onopen -> setState -> useEffect cleanup 循环
-      // fetchWindows 由轮询（2秒）处理
-    }
-
-    ws.onmessage = (e) => {
-      term.write(e.data)
-      if (!userScrolledRef.current) term.scrollToBottom()
-    }
-
-    // 重连逻辑
+    // 重连逻辑：不刷新页面，直接创建新 WebSocket
     let reconnectAttempts = 0
-    const maxReconnectAttempts = 5
-    const reconnectDelay = () => Math.min(1000 * Math.pow(2, reconnectAttempts), 10000)
+    const maxReconnectAttempts = 8
+    const reconnectDelay = () => Math.min(1000 * Math.pow(2, reconnectAttempts), 15000)
 
-    function tryReconnect() {
-      if (reconnectAttempts >= maxReconnectAttempts) {
-        term.write('\r\n\x1b[31m[Nexus: 重连失败，请刷新页面]\x1b[0m\r\n')
-        return
+    function createWs(isReconnect = false) {
+      const s = activeTmuxSessionRef.current
+      const wi = activeWindowIndexRef.current
+      const newWs = new WebSocket(`${protocol}//${location.host}/ws?token=${encodeURIComponent(token)}&window=${wi}&session=${encodeURIComponent(s)}`)
+      wsRef.current = newWs
+
+      newWs.onopen = () => {
+        if (isReconnect) {
+          term.write('\r\n\x1b[32m[Nexus: 已重新连接]\x1b[0m\r\n')
+        } else {
+          clearTimeout(loadingTimer)
+        }
+        reconnectAttempts = 0
+        hasConnectedRef.current = true
+        setIsConnecting(false)
+        fitAddon.fit()
+        newWs.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
       }
-      reconnectAttempts++
-      term.write(`\r\n\x1b[33m[Nexus: 连接断开，${reconnectDelay() / 1000}s 后重连 (${reconnectAttempts}/${maxReconnectAttempts})...]\x1b[0m\r\n`)
-      setTimeout(() => {
-        // 触发重新初始化 WebSocket 需要重新执行 useEffect，这里简单刷新
-        location.reload()
-      }, reconnectDelay())
+
+      newWs.onmessage = (e) => {
+        term.write(e.data)
+        if (!userScrolledRef.current) term.scrollToBottom()
+      }
+
+      newWs.onclose = (e) => {
+        if (intentionalClose) return
+        if (e.code === 4001) {
+          term.write('\r\n\x1b[31m[Nexus: 认证失败，请刷新重新登录]\x1b[0m\r\n')
+          return
+        }
+        if (reconnectAttempts >= maxReconnectAttempts) {
+          term.write('\r\n\x1b[31m[Nexus: 重连失败，请刷新页面]\x1b[0m\r\n')
+          return
+        }
+        reconnectAttempts++
+        const delay = reconnectDelay()
+        term.write(`\r\n\x1b[33m[Nexus: 连接断开，${delay / 1000}s 后重连 (${reconnectAttempts}/${maxReconnectAttempts})...]\x1b[0m\r\n`)
+        setTimeout(() => createWs(true), delay)
+      }
+
+      newWs.onerror = () => term.write('\r\n\x1b[31m[Nexus: WebSocket 错误]\x1b[0m\r\n')
     }
 
-    ws.onclose = (e) => {
-      if (intentionalClose) return
-      if (e.code === 4001) {
-        term.write('\r\n\x1b[31m[Nexus: 认证失败，请刷新重新登录]\x1b[0m\r\n')
-      } else {
-        tryReconnect()
-      }
-    }
+    createWs()
 
-    ws.onerror = () => term.write('\r\n\x1b[31m[Nexus: WebSocket 错误]\x1b[0m\r\n')
-
-    term.onData((data) => ws.send(data))
+    // 键盘输入 → 发送到当前 WebSocket
+    term.onData((data) => wsRef.current?.send(data))
 
     let touchStartY = 0
     let touchLastY = 0
@@ -897,8 +900,8 @@ export default function Terminal({ token }: Props) {
           term.options.fontSize = newSize
           localStorage.setItem(FONT_SIZE_KEY, String(newSize))
           fitAddon.fit()
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
+          if (wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
           }
         }
       } else if (!isPinching) {
@@ -939,8 +942,8 @@ export default function Terminal({ token }: Props) {
 
     function sendResize() {
       fitAddon.fit()
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
       }
     }
 
@@ -960,7 +963,7 @@ export default function Terminal({ token }: Props) {
       container.removeEventListener('touchstart', onTouchStart)
       container.removeEventListener('touchmove', onTouchMove)
       container.removeEventListener('touchend', onTouchEnd)
-      ws.close()
+      wsRef.current?.close()
       term.dispose()
     }
   }, [token, activeWindowIndex])
