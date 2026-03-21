@@ -50,6 +50,8 @@ if [ -d "${PROJECT}/.git" ] || [ -f "$GITIGNORE" ]; then
 fi
 
 # ── 导出所有环境变量 ──
+# 保留真实 HOME 的 .local/bin（claude 安装在那里），避免 HOME 切换后找不到自身
+export PATH="${HOME}/.local/bin:${PATH}"
 export HOME="$DATA_DIR"
 export LANG="C.UTF-8"
 export LC_ALL="C.UTF-8"
