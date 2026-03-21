@@ -13,6 +13,10 @@ interface Props {
   selectionMode: boolean
   onToggleSelectionMode: () => void
   onOpenSettings?: () => void
+  onOpenSessions?: () => void
+  onOpenTasks?: () => void
+  onUpload?: () => void
+  runningTaskCount?: number
 }
 
 const KEY_MAP = Object.fromEntries(ALL_KEYS.map(k => [k.id, k]))
@@ -55,7 +59,7 @@ interface DragState {
 
 const ITEM_HEIGHT = 48 // px，每行编辑项高度
 
-export default function Toolbar({ token, sendToWs, scrollToBottom, termRef: _termRef, themeMode, onToggleTheme, selectionMode, onToggleSelectionMode, onOpenSettings }: Props) {
+export default function Toolbar({ token, sendToWs, scrollToBottom, termRef: _termRef, themeMode, onToggleTheme, selectionMode, onToggleSelectionMode, onOpenSettings, onOpenSessions, onOpenTasks, onUpload, runningTaskCount }: Props) {
   const [config, setConfig]           = useState<ToolbarConfig>(loadConfig)
   const [collapsed, setCollapsed]     = useState(() => {
     const saved = localStorage.getItem(COLLAPSED_KEY)
@@ -66,6 +70,7 @@ export default function Toolbar({ token, sendToWs, scrollToBottom, termRef: _ter
   const [editing, setEditing]         = useState(false)
   const [drag, setDrag]               = useState<DragState | null>(null)
   const [savedFlash, setSavedFlash]   = useState(false)
+  const [showQuickMenu, setShowQuickMenu] = useState(false)
   const [isPC, setIsPC]               = useState(false)
   const [isWidePC, setIsWidePC]       = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1024)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -437,10 +442,6 @@ export default function Toolbar({ token, sendToWs, scrollToBottom, termRef: _ter
         <button style={{...s.iconBtn, color: tc.iconColor}} onPointerDown={(e) => { e.preventDefault(); setCollapsed(v => { const n = !v; localStorage.setItem(COLLAPSED_KEY, String(n)); return n }) }}>
           {collapsed ? '▲' : '▼'}
         </button>
-        <button style={{...s.iconBtn, color: tc.iconColor}} onPointerDown={(e) => { e.preventDefault(); setEditing(true) }}>✏</button>
-        <button style={{...s.iconBtn, color: tc.iconColor}} onPointerDown={(e) => { e.preventDefault(); onToggleTheme() }}>
-          {themeMode === 'dark' ? '☀' : '☾'}
-        </button>
         <button
           style={selectionMode ? s.copyBtnActive : s.copyBtn}
           onPointerDown={(e) => { e.preventDefault(); onToggleSelectionMode() }}
@@ -448,10 +449,39 @@ export default function Toolbar({ token, sendToWs, scrollToBottom, termRef: _ter
         >
           {selectionMode ? '✓' : '⎘'}
         </button>
-        {onOpenSettings && (
-          <button style={{...s.iconBtn, color: tc.iconColor}} onPointerDown={(e) => { e.preventDefault(); onOpenSettings() }} title="设置">
-            ⚙
-          </button>
+        {/* ⚙ quick menu */}
+        <div style={{ position: 'relative' }}>
+          <button style={{...s.iconBtn, color: tc.iconColor}} onPointerDown={(e) => { e.preventDefault(); setShowQuickMenu(v => !v) }} title="更多">⚙</button>
+          {showQuickMenu && (
+            <>
+              <div style={{ position: 'fixed', inset: 0, zIndex: 300 }} onPointerDown={() => setShowQuickMenu(false)} />
+              <div style={{ position: 'absolute', bottom: '100%', right: 0, background: 'var(--nexus-menu-bg)', border: '1px solid var(--nexus-border)', borderRadius: 8, padding: '4px 0', minWidth: 160, zIndex: 301, boxShadow: '0 -4px 16px rgba(0,0,0,0.3)', marginBottom: 6 }}>
+                <button style={s.quickMenuItem} onPointerDown={(e) => { e.preventDefault(); onToggleTheme(); setShowQuickMenu(false) }}>
+                  <span style={{ width: 18 }}>{themeMode === 'dark' ? '☀' : '☾'}</span>
+                  <span>{themeMode === 'dark' ? '切换亮色' : '切换暗色'}</span>
+                </button>
+                <button style={s.quickMenuItem} onPointerDown={(e) => { e.preventDefault(); setEditing(true); setShowQuickMenu(false) }}>
+                  <span style={{ width: 18 }}>✏</span><span>编辑快捷键</span>
+                </button>
+                {onOpenTasks && (
+                  <button style={s.quickMenuItem} onPointerDown={(e) => { e.preventDefault(); onOpenTasks(); setShowQuickMenu(false) }}>
+                    <span style={{ width: 18 }}>📋</span>
+                    <span>任务面板</span>
+                    {!!runningTaskCount && <span style={{ marginLeft: 'auto', background: '#22c55e', color: '#fff', borderRadius: 8, padding: '1px 6px', fontSize: 11 }}>{runningTaskCount}</span>}
+                  </button>
+                )}
+                {onUpload && (
+                  <button style={s.quickMenuItem} onPointerDown={(e) => { e.preventDefault(); onUpload(); setShowQuickMenu(false) }}>
+                    <span style={{ width: 18 }}>📎</span><span>上传文件</span>
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+        {/* ≡ session drawer */}
+        {onOpenSessions && (
+          <button style={{...s.iconBtn, color: tc.iconColor, fontSize: 22, lineHeight: 1}} onPointerDown={(e) => { e.preventDefault(); onOpenSessions() }} title="会话管理">≡</button>
         )}
       </div>
 
@@ -521,6 +551,21 @@ const s: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     padding: '3px 6px',
     gap: 4,
+  },
+  quickMenuItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    background: 'transparent',
+    border: 'none',
+    color: 'var(--nexus-text)',
+    cursor: 'pointer',
+    fontSize: 14,
+    padding: '10px 14px',
+    width: '100%',
+    textAlign: 'left' as const,
+    touchAction: 'manipulation',
+    WebkitTapHighlightColor: 'transparent',
   },
   topBarPC: {
     display: 'flex',

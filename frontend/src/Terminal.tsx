@@ -4,7 +4,6 @@ import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import '@xterm/xterm/css/xterm.css'
 import Toolbar from './Toolbar'
-import TabBar from './TabBar'
 import { getWindowStatus, STATUS_DOT_COLOR, STATUS_DOT_TITLE } from './windowStatus'
 
 const SessionManager = lazy(() => import('./SessionManager'))
@@ -443,6 +442,7 @@ export default function Terminal({ token }: Props) {
   const [activeWindowIndex, setActiveWindowIndex] = useState(() => parseInt(localStorage.getItem(WINDOW_KEY) || '0', 10))
   const [showSettings, setShowSettings] = useState(false)
   const [showNewSession, setShowNewSession] = useState(false)
+  const [showSessionDrawer, setShowSessionDrawer] = useState(false)
   const [themeMode, setThemeMode] = useState<ThemeMode>(getInitialTheme)
   const [selectionMode, setSelectionMode] = useState(false)
   const selectionModeRef = useRef(selectionMode)
@@ -1150,6 +1150,10 @@ export default function Terminal({ token }: Props) {
     selectionMode,
     onToggleSelectionMode: () => setSelectionMode(v => !v),
     onOpenSettings: () => setShowSettings(true),
+    onOpenSessions: () => setShowSessionDrawer(true),
+    onOpenTasks: () => setShowTasks(true),
+    onUpload: handleFileUpload,
+    runningTaskCount,
   }
 
   return (
@@ -1265,26 +1269,59 @@ export default function Terminal({ token }: Props) {
               <button style={styles.scrollBtn} onClick={scrollToBottom} title="滚到底部">↓</button>
             )}
           </div>
-          <TabBar
-            windows={windows}
-            activeIndex={activeWindowIndex}
-            onSwitch={attachToWindow}
-            onClose={closeWindow}
-            onAdd={openNewSessionDialog}
-            onOpenSettings={() => setShowSettings(true)}
-            onOpenTasks={() => setShowTasks(true)}
-            onUpload={handleFileUpload}
-            onRename={renameWindow}
-            token={token}
-            sessions={tmuxSessions}
-            activeSession={activeTmuxSession}
-            onSwitchSession={handleSwitchSession}
-            windowOutputs={windowOutputs}
-            runningTaskCount={runningTaskCount}
-            position="bottom"
-          />
           <Toolbar {...toolbarProps} />
         </div>
+      )}
+
+      {/* 移动端会话抽屉 */}
+      {showSessionDrawer && !isWidePC && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(0,0,0,0.5)' }} onPointerDown={() => setShowSessionDrawer(false)} />
+          <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 401, background: 'var(--nexus-menu-bg)', borderRadius: '12px 12px 0 0', border: '1px solid var(--nexus-border)', borderBottom: 'none', maxHeight: '70vh', display: 'flex', flexDirection: 'column', boxShadow: '0 -4px 24px rgba(0,0,0,0.4)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--nexus-border)', flexShrink: 0 }}>
+              <span style={{ color: 'var(--nexus-text)', fontWeight: 600, fontSize: 15 }}>会话管理</span>
+              <button style={{ background: 'transparent', border: 'none', color: 'var(--nexus-text2)', fontSize: 22, cursor: 'pointer', padding: '0 4px', lineHeight: 1 }} onPointerDown={() => setShowSessionDrawer(false)}>×</button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
+              {windows.map(win => {
+                const status = getWindowStatus(windowOutputs[win.index])
+                const isActive = win.index === activeWindowIndex
+                return (
+                  <div
+                    key={win.index}
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', cursor: 'pointer', background: isActive ? 'var(--nexus-tab-active)' : 'transparent', borderBottom: '1px solid var(--nexus-border)' }}
+                    onPointerDown={() => { attachToWindow(win.index); setShowSessionDrawer(false) }}
+                  >
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: STATUS_DOT_COLOR[status], flexShrink: 0, display: 'inline-block' }} title={STATUS_DOT_TITLE[status]} />
+                    <span style={{ flex: 1, color: 'var(--nexus-text)', fontSize: 14, fontFamily: 'Menlo, Monaco, monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{win.name}</span>
+                    {isActive && <span style={{ color: '#3b82f6', fontSize: 13, fontWeight: 600 }}>✓</span>}
+                  </div>
+                )
+              })}
+              {/* tmux session 切换（多 session 时显示） */}
+              {tmuxSessions.length > 1 && (
+                <div style={{ padding: '10px 16px 4px', color: 'var(--nexus-muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>Tmux Sessions</div>
+              )}
+              {tmuxSessions.length > 1 && tmuxSessions.map(sess => (
+                <div
+                  key={sess}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', cursor: 'pointer', background: sess === activeTmuxSession ? 'var(--nexus-tab-active)' : 'transparent' }}
+                  onPointerDown={() => { handleSwitchSession(sess); setShowSessionDrawer(false) }}
+                >
+                  <span style={{ color: sess === activeTmuxSession ? '#3b82f6' : 'var(--nexus-text2)', fontSize: 13 }}>{sess === activeTmuxSession ? '✓ ' : '  '}{sess}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ padding: '12px 16px', borderTop: '1px solid var(--nexus-border)', flexShrink: 0 }}>
+              <button
+                style={{ width: '100%', background: '#3b82f6', border: 'none', borderRadius: 8, color: '#fff', fontSize: 14, fontWeight: 600, padding: '12px 0', cursor: 'pointer', touchAction: 'manipulation' }}
+                onPointerDown={() => { setShowSessionDrawer(false); openNewSessionDialog() }}
+              >
+                + 新建会话
+              </button>
+            </div>
+          </div>
+        </>
       )}
 
       {showTasks && (
