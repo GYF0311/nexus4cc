@@ -857,7 +857,7 @@ const s: Record<string, React.CSSProperties> = {
     boxSizing: 'border-box',
   },
   editRowTarget: {
-    background: 'rgba(59,130,246,0.1)',
+    background: 'color-mix(in srgb, var(--nexus-accent) 12%, transparent)',
     borderColor: 'var(--nexus-accent)',
   },
   editRowSource: {

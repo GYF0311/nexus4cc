@@ -114,12 +114,12 @@ const styles: Record<string, React.CSSProperties> = {
     outline: 'none',
   },
   error: {
-    color: '#ef4444',
+    color: 'var(--nexus-error)',
     fontSize: 14,
     textAlign: 'center',
   },
   button: {
-    background: '#3b82f6',
+    background: 'var(--nexus-accent)',
     border: 'none',
     borderRadius: 8,
     color: '#fff',

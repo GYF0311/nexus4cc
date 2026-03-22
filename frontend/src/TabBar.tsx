@@ -257,7 +257,7 @@ export default function TabBar({ windows, activeIndex, onSwitch, onClose, onAdd,
           <div style={{ color: 'var(--nexus-text2)', fontSize: 11, marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
             <span>最后输出 ({windows.find(w => w.index === hoverIndex)?.name})</span>
             {windowOutputs[hoverIndex].clients > 0 && (
-              <span style={{ color: '#22c55e' }}>● 在线</span>
+              <span style={{ color: 'var(--nexus-success)' }}>● 在线</span>
             )}
           </div>
           <pre style={{
@@ -364,7 +364,7 @@ const s: Record<string, React.CSSProperties> = {
     left: '20%',
     right: '20%',
     height: 2,
-    background: '#3b82f6',
+    background: 'var(--nexus-accent)',
     borderRadius: 1,
   },
   runningDot: {
@@ -374,7 +374,7 @@ const s: Record<string, React.CSSProperties> = {
     width: 6,
     height: 6,
     borderRadius: '50%',
-    background: '#22c55e',
+    background: 'var(--nexus-success)',
   },
   actions: {
     display: 'flex',
@@ -430,7 +430,7 @@ const s: Record<string, React.CSSProperties> = {
     gap: 8,
     background: 'transparent',
     border: 'none',
-    color: '#ef4444',
+    color: 'var(--nexus-error)',
     cursor: 'pointer',
     fontSize: 14,
     padding: '8px 16px',
@@ -447,7 +447,7 @@ const s: Record<string, React.CSSProperties> = {
     gap: 8,
     background: 'transparent',
     border: 'none',
-    color: '#ef4444',
+    color: 'var(--nexus-error)',
     cursor: 'pointer',
     fontSize: 14,
     padding: '8px 16px',

@@ -198,7 +198,7 @@ export default function SessionManager({ token, onClose }: Props) {
               </div>
             ))}
           </div>
-          <div style={{ ...s.section, color: '#475569', fontSize: 11, lineHeight: 1.6 }}>
+          <div style={{ ...s.section, color: 'var(--nexus-text2)', fontSize: 11, lineHeight: 1.6 }}>
             <div style={s.sectionTitle}>说明</div>
             <p>每个配置对应一个 API provider。新建会话时选择配置后，会以该 provider 的 API key 启动 claude，且每个项目的会话历史独立保存在项目目录的 <code style={s.code}>.claude-data/</code> 中，退出后再次进入可自动续接上下文。</p>
           </div>

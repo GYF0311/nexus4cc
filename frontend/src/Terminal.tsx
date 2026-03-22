@@ -56,7 +56,7 @@ const DARK_THEME: ITheme = {
 }
 
 const LIGHT_THEME: ITheme = {
-  background: '#f8fafc',
+  background: '#ffffff',
   foreground: '#1e293b',
   cursor: '#475569',
   cursorAccent: '#f8fafc',
@@ -95,17 +95,18 @@ export function getInitialTheme(): ThemeMode {
 function applyNexusCssVars(mode: ThemeMode) {
   const isDark = mode === 'dark'
   const root = document.documentElement
-  root.style.setProperty('--nexus-bg',         isDark ? '#0f172a' : '#f8fafc')  // slate-900 / slate-50
-  root.style.setProperty('--nexus-bg2',        isDark ? '#1e293b' : '#f1f5f9')  // slate-800 / slate-100
-  root.style.setProperty('--nexus-menu-bg',    isDark ? '#1e293b' : '#ffffff')   // 面板/弹层背景
-  root.style.setProperty('--nexus-border',     isDark ? '#334155' : '#e2e8f0')  // slate-700 / slate-200
-  root.style.setProperty('--nexus-text',       isDark ? '#f1f5f9' : '#0f172a')  // slate-100 / slate-900
-  root.style.setProperty('--nexus-text2',      isDark ? '#94a3b8' : '#64748b')  // slate-400 / slate-500
-  root.style.setProperty('--nexus-muted',      isDark ? '#475569' : '#94a3b8')  // slate-600 / slate-400
-  root.style.setProperty('--nexus-tab-active', isDark ? '#1e293b' : '#e2e8f0')  // 选中标签高亮
-  root.style.setProperty('--nexus-accent',     '#3b82f6')                        // blue-500
-  root.style.setProperty('--nexus-success',    '#22c55e')                        // green-500
-  root.style.setProperty('--nexus-error',      '#ef4444')                        // red-500
+  root.style.setProperty('--nexus-bg',         isDark ? '#0f172a' : '#ffffff')   // slate-900 / white
+  root.style.setProperty('--nexus-bg2',        isDark ? '#1e293b' : '#f1f5f9')   // slate-800 / slate-100
+  root.style.setProperty('--nexus-menu-bg',    isDark ? '#1e293b' : '#ffffff')    // 面板/弹层背景
+  root.style.setProperty('--nexus-border',     isDark ? '#334155' : '#e2e8f0')   // slate-700 / slate-200
+  root.style.setProperty('--nexus-text',       isDark ? '#f1f5f9' : '#0f172a')   // slate-100 / slate-900
+  root.style.setProperty('--nexus-text2',      isDark ? '#94a3b8' : '#64748b')   // slate-400 / slate-500
+  root.style.setProperty('--nexus-muted',      isDark ? '#475569' : '#94a3b8')   // slate-600 / slate-400
+  root.style.setProperty('--nexus-tab-active', isDark ? '#1e293b' : '#f1f5f9')   // 选中标签高亮
+  root.style.setProperty('--nexus-accent',     '#3b82f6')                         // blue-500
+  root.style.setProperty('--nexus-success',    '#22c55e')                         // green-500
+  root.style.setProperty('--nexus-warning',    '#f59e0b')                         // amber-500
+  root.style.setProperty('--nexus-error',      '#ef4444')                         // red-500
 }
 applyNexusCssVars(getInitialTheme())
 
@@ -217,7 +218,7 @@ function Sidebar({
               cursor: 'pointer',
               background: win.index === activeIndex ? 'var(--nexus-tab-active)' :
                           hoveredIndex === win.index ? 'var(--nexus-bg2)' : 'transparent',
-              borderLeft: win.index === activeIndex ? '3px solid #3b82f6' : '3px solid transparent',
+              borderLeft: win.index === activeIndex ? '3px solid var(--nexus-accent)' : '3px solid transparent',
               transition: 'background 0.15s',
               gap: 8,
             }}
@@ -318,7 +319,7 @@ function Sidebar({
       }}>
         <button
           style={{
-            background: '#3b82f6',
+            background: 'var(--nexus-accent)',
             border: 'none',
             borderRadius: 6,
             color: '#fff',
@@ -1378,7 +1379,7 @@ export default function Terminal({ token }: Props) {
                             if (e.key === 'Escape') setDrawerRenameIndex(null)
                           }}
                           onBlur={() => setDrawerRenameIndex(null)}
-                          style={{ flex: 1, background: 'var(--nexus-bg)', border: '1px solid #3b82f6', borderRadius: 6, color: 'var(--nexus-text)', fontSize: 14, fontFamily: 'Menlo, Monaco, monospace', padding: '4px 8px', outline: 'none' }}
+                          style={{ flex: 1, background: 'var(--nexus-bg)', border: '1px solid var(--nexus-accent)', borderRadius: 6, color: 'var(--nexus-text)', fontSize: 14, fontFamily: 'Menlo, Monaco, monospace', padding: '4px 8px', outline: 'none' }}
                           onClick={e => e.stopPropagation()}
                         />
                       ) : (
@@ -1401,7 +1402,7 @@ export default function Terminal({ token }: Props) {
                           onPointerDown={e => { e.stopPropagation(); setDrawerRenameValue(win.name); setDrawerRenameIndex(win.index); setDrawerMenuIndex(null) }}
                         ><span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}><Icon name="pencil" size={14} />改名</span></button>
                         <button
-                          style={{ flex: 1, background: 'transparent', border: '1px solid #ef4444', borderRadius: 6, color: '#ef4444', fontSize: 13, padding: '7px 0', cursor: 'pointer' }}
+                          style={{ flex: 1, background: 'transparent', border: '1px solid var(--nexus-error)', borderRadius: 6, color: 'var(--nexus-error)', fontSize: 13, padding: '7px 0', cursor: 'pointer' }}
                           onPointerDown={e => { e.stopPropagation(); closeWindow(win.index); setDrawerMenuIndex(null); if (windows.length <= 1) setShowSessionDrawer(false) }}
                         ><span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}><Icon name="x" size={14} />关闭</span></button>
                       </div>
@@ -1425,7 +1426,7 @@ export default function Terminal({ token }: Props) {
             </div>
             <div style={{ padding: '12px 16px', borderTop: '1px solid var(--nexus-border)', flexShrink: 0 }}>
               <button
-                style={{ width: '100%', background: '#3b82f6', border: 'none', borderRadius: 8, color: '#fff', fontSize: 14, fontWeight: 600, padding: '12px 0', cursor: 'pointer', touchAction: 'manipulation' }}
+                style={{ width: '100%', background: 'var(--nexus-accent)', border: 'none', borderRadius: 8, color: '#fff', fontSize: 14, fontWeight: 600, padding: '12px 0', cursor: 'pointer', touchAction: 'manipulation' }}
                 onClick={() => { setShowSessionDrawer(false); openNewSessionDialog() }}
               >
                 + 新建会话
@@ -1616,7 +1617,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: 32,
     height: 32,
     border: '3px solid var(--nexus-border)',
-    borderTopColor: '#3b82f6',
+    borderTopColor: 'var(--nexus-accent)',
     borderRadius: '50%',
     animation: 'spin 1s linear infinite',
   },
@@ -1631,7 +1632,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: 36,
     height: 36,
     borderRadius: '50%',
-    background: 'rgba(59,130,246,0.85)',
+    background: 'var(--nexus-accent)',
     border: 'none',
     color: '#fff',
     fontSize: 18,

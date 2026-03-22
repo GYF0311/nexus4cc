@@ -180,7 +180,7 @@ export default function TaskPanel({ token, windows, activeWindowName, tmuxSessio
           <div style={{ display: 'flex', gap: 8, alignSelf: 'flex-end' }}>
             {isRunning && (
               <button
-                style={{ ...s.sendBtn, background: '#ef4444' }}
+                style={{ ...s.sendBtn, background: 'var(--nexus-error)' }}
                 onClick={() => abortRef.current?.abort()}
               >
                 <Icon name="x" size={14} /> 取消
@@ -226,7 +226,7 @@ export default function TaskPanel({ token, windows, activeWindowName, tmuxSessio
                   >
                     <span style={{
                       ...s.statusDot,
-                      background: task.status === 'success' ? '#22c55e' : task.status === 'running' ? '#f59e0b' : '#ef4444',
+                      background: task.status === 'success' ? 'var(--nexus-success)' : task.status === 'running' ? 'var(--nexus-warning)' : 'var(--nexus-error)',
                       ...(task.status === 'running' ? { animation: 'pulse 1.5s ease-in-out infinite' } : {}),
                     }} />
                     <span style={s.taskPrompt} title={task.prompt}>{task.prompt.slice(0, 60)}{task.prompt.length > 60 ? '...' : ''}</span>
@@ -359,7 +359,7 @@ const s: Record<string, React.CSSProperties> = {
     lineHeight: 1.5,
   },
   sendBtn: {
-    background: '#3b82f6',
+    background: 'var(--nexus-accent)',
     border: 'none',
     borderRadius: 6,
     color: '#fff',
@@ -389,7 +389,7 @@ const s: Record<string, React.CSSProperties> = {
     width: 8,
     height: 8,
     borderRadius: '50%',
-    background: '#22c55e',
+    background: 'var(--nexus-success)',
     animation: 'spin 1s linear infinite',
     flexShrink: 0,
   },
@@ -468,7 +468,7 @@ const s: Record<string, React.CSSProperties> = {
     flexShrink: 0,
   },
   sourceBadge: {
-    background: '#2563eb',
+    background: 'var(--nexus-accent)',
     color: '#fff',
     fontSize: 9,
     fontWeight: 700,
