@@ -820,7 +820,8 @@ export default function Terminal({ token }: Props) {
 
     const container = containerRef.current!
     term.open(container)
-    fitAddon.fit()
+    // Defer initial fit so fonts and flex layout are fully settled
+    requestAnimationFrame(() => fitAddon.fit())
 
     // On mobile: suppress keyboard from xterm's internal textarea until user explicitly enables it
     const xtermTextarea = term.textarea
@@ -998,9 +999,18 @@ export default function Terminal({ token }: Props) {
     resizeObserver.observe(container)
     window.addEventListener('orientationchange', onOrientationChange)
 
+    // Re-fit when tab/PWA returns to foreground
+    function onVisibilityChange() {
+      if (document.visibilityState === 'visible') sendResize()
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener('pageshow', sendResize)
+
     return () => {
       resizeObserver.disconnect()
       window.removeEventListener('orientationchange', onOrientationChange)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.removeEventListener('pageshow', sendResize)
       container.removeEventListener('touchstart', onTouchStart)
       container.removeEventListener('touchmove', onTouchMove)
       container.removeEventListener('touchend', onTouchEnd)
@@ -1059,6 +1069,13 @@ export default function Terminal({ token }: Props) {
         fitAddonRef.current?.fit()
         const term = termRef.current
         if (term) newWs.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
+        // Follow-up fit in case layout wasn't fully settled at onopen time
+        requestAnimationFrame(() => {
+          fitAddonRef.current?.fit()
+          if (wsRef.current?.readyState === WebSocket.OPEN && termRef.current) {
+            wsRef.current.send(JSON.stringify({ type: 'resize', cols: termRef.current.cols, rows: termRef.current.rows }))
+          }
+        })
       }
 
       newWs.onmessage = (e) => {
@@ -1523,8 +1540,8 @@ export default function Terminal({ token }: Props) {
           <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: termBg, display: 'flex', flexDirection: 'column' }}>
             <GhostShield />
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: `1px solid ${termMuted}44`, flexShrink: 0 }}>
-              <span style={{ color: termFg, fontWeight: 600, fontSize: termFontSize, fontFamily: termFontFamily }}>历史记录</span>
-              <span style={{ color: termMuted, fontSize: termFontSize * 0.75, flex: 1, textAlign: 'center', fontFamily: termFontFamily }}>滚到底部返回终端</span>
+              <span style={{ color: termFg, fontWeight: 600, fontSize: 14 }}>历史记录</span>
+              <span style={{ color: termMuted, fontSize: 12, flex: 1, textAlign: 'center' }}>滚到底部返回终端</span>
               <button
                 style={{ background: 'transparent', border: 'none', color: termMuted, cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 onClick={closeScrollback}
@@ -1538,7 +1555,7 @@ export default function Terminal({ token }: Props) {
               {scrollbackLoading ? (
                 <div style={{ color: termMuted, textAlign: 'center', padding: 32, fontFamily: termFontFamily, fontSize: termFontSize }}>加载中...</div>
               ) : (
-                <pre style={{ margin: 0, padding: '0 10px', fontFamily: termFontFamily, fontSize: termFontSize, color: termFg, whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: 1.5 }}>
+                <pre style={{ margin: 0, padding: 0, fontFamily: termFontFamily, fontSize: termFontSize, color: termFg, whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: 1.2 }}>
                   {scrollbackContent}
                 </pre>
               )}
