@@ -122,8 +122,10 @@ function Sidebar({
   onAdd,
   onOpenSettings,
   onOpenTasks,
-  onUpload,
   onRename,
+  onFocusTerm,
+  themeMode,
+  onToggleTheme,
   windowOutputs,
   runningTaskCount,
 }: {
@@ -138,8 +140,10 @@ function Sidebar({
   onAdd: () => void
   onOpenSettings: () => void
   onOpenTasks: () => void
-  onUpload: () => void
   onRename?: (index: number, name: string) => void
+  onFocusTerm?: () => void
+  themeMode: 'dark' | 'light'
+  onToggleTheme: () => void
   runningTaskCount?: number
 }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
@@ -163,23 +167,29 @@ function Sidebar({
 
   return (
     <div style={{
-      width: 200,
-      flexShrink: 0,
+      flex: 1,
       background: 'var(--nexus-bg)',
-      borderRight: '1px solid var(--nexus-border)',
       display: 'flex',
       flexDirection: 'column',
-      height: '100%',
+      minHeight: 0,
+      overflow: 'hidden',
     }}>
       {/* Session Selector */}
       <div style={{
         padding: '8px 12px',
         borderBottom: '1px solid var(--nexus-border)',
       }}>
-        <div style={{ color: 'var(--nexus-muted)', fontSize: 11, marginBottom: 4 }}>Session</div>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
+          <span style={{ color: 'var(--nexus-muted)', fontSize: 11, flex: 1 }}>Session</span>
+          <button
+            style={{ background: 'transparent', border: 'none', color: 'var(--nexus-text2)', cursor: 'pointer', padding: '2px 4px', display: 'flex', alignItems: 'center', borderRadius: 4 }}
+            onClick={onToggleTheme}
+            title={themeMode === 'dark' ? '切换浅色' : '切换深色'}
+          ><Icon name={themeMode === 'dark' ? 'sun' : 'moon'} size={14} /></button>
+        </div>
         <select
           value={activeSession}
-          onChange={(e) => onSwitchSession(e.target.value)}
+          onChange={(e) => { onSwitchSession(e.target.value); setTimeout(() => onFocusTerm?.(), 50) }}
           style={{
             width: '100%',
             background: 'var(--nexus-bg2)',
@@ -213,7 +223,7 @@ function Sidebar({
             }}
             onMouseEnter={() => setHoveredIndex(win.index)}
             onMouseLeave={() => setHoveredIndex(null)}
-            onClick={() => onSwitch(win.index)}
+            onClick={() => { onSwitch(win.index); setTimeout(() => onFocusTerm?.(), 50) }}
           >
             <span style={{
               flex: 1,
@@ -335,20 +345,6 @@ function Sidebar({
           }}
           onClick={onOpenTasks}
         ><span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Icon name="clipboard" size={16} />任务面板{runningTaskCount ? <span style={{ marginLeft: 'auto', background: 'var(--nexus-success)', color: '#fff', borderRadius: 10, fontSize: 10, fontWeight: 700, padding: '1px 5px' }}>{runningTaskCount}</span> : null}</span></button>
-        <button
-          style={{
-            background: 'transparent',
-            border: '1px solid var(--nexus-border)',
-            borderRadius: 6,
-            color: 'var(--nexus-text2)',
-            cursor: 'pointer',
-            fontSize: 13,
-            padding: '7px 12px',
-            width: '100%',
-            textAlign: 'left',
-          }}
-          onClick={onUpload}
-        ><span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Icon name="paperclip" size={16} />上传文件</span></button>
         <button
           style={{
             background: 'transparent',
@@ -1124,6 +1120,21 @@ export default function Terminal({ token }: Props) {
     if (isComposingRef.current) return
     if (e.key === 'Enter') { e.preventDefault(); sendToWs('\r') }
     else if (e.key === 'Backspace') { e.preventDefault(); sendToWs('\x7f') }
+    else if (e.key === 'Tab') { e.preventDefault(); sendToWs('\t') }
+    else if (e.key === 'Escape') { e.preventDefault(); sendToWs('\x1b') }
+    else if (e.key === 'Delete') { e.preventDefault(); sendToWs('\x1b[3~') }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); sendToWs('\x1b[A') }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); sendToWs('\x1b[B') }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); sendToWs('\x1b[C') }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); sendToWs('\x1b[D') }
+    else if (e.key === 'Home') { e.preventDefault(); sendToWs('\x1b[H') }
+    else if (e.key === 'End') { e.preventDefault(); sendToWs('\x1b[F') }
+    else if (e.key === 'PageUp') { e.preventDefault(); sendToWs('\x1b[5~') }
+    else if (e.key === 'PageDown') { e.preventDefault(); sendToWs('\x1b[6~') }
+    else if (e.ctrlKey && e.key.length === 1) {
+      e.preventDefault()
+      sendToWs(String.fromCharCode(e.key.toLowerCase().charCodeAt(0) - 96))
+    }
     else if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
       // Intercept printable chars (letters, digits, punctuation) directly from keydown.
       // preventDefault stops the browser from updating input.value, so onChange won't
@@ -1287,24 +1298,30 @@ export default function Terminal({ token }: Props) {
 
       {isWidePC ? (
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
-          <Sidebar
-            windows={windows}
-            activeIndex={activeWindowIndex}
-            sessions={tmuxSessions}
-            activeSession={activeTmuxSession}
-            onSwitchSession={handleSwitchSession}
-            onSwitch={attachToWindow}
-            onClose={closeWindow}
-            onAdd={openNewSessionDialog}
-            onOpenSettings={() => setShowSettings(true)}
-            onOpenTasks={() => setShowTasks(true)}
-            onUpload={handleFileUpload}
-            onRename={renameWindow}
-            windowOutputs={windowOutputs}
-            runningTaskCount={runningTaskCount}
-          />
+          {/* Sidebar column: session/window list + embedded shortcut keys */}
+          <div style={{ width: 220, flexShrink: 0, borderRight: '1px solid var(--nexus-border)', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <Sidebar
+              windows={windows}
+              activeIndex={activeWindowIndex}
+              sessions={tmuxSessions}
+              activeSession={activeTmuxSession}
+              onSwitchSession={handleSwitchSession}
+              onSwitch={attachToWindow}
+              onClose={closeWindow}
+              onAdd={openNewSessionDialog}
+              onOpenSettings={() => setShowSettings(true)}
+              onOpenTasks={() => setShowTasks(true)}
+              onRename={renameWindow}
+              onFocusTerm={() => termRef.current?.textarea?.focus()}
+              themeMode={themeMode}
+              onToggleTheme={toggleTheme}
+              windowOutputs={windowOutputs}
+              runningTaskCount={runningTaskCount}
+            />
+            <Toolbar {...toolbarProps} embedded />
+          </div>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, position: 'relative' }}>
-            <div ref={containerRef} style={styles.terminal} onClick={() => inputRef.current?.focus()} />
+            <div ref={containerRef} style={styles.terminal} onClick={() => termRef.current?.textarea?.focus()} />
             {isConnecting && (
               <div style={styles.loadingOverlay}>
                 <div style={styles.spinner} />
@@ -1314,7 +1331,6 @@ export default function Terminal({ token }: Props) {
             {isScrolledUp && (
               <button style={styles.scrollBtn} onClick={scrollToBottom} title="滚到底部"><Icon name="arrowDown" size={16} /></button>
             )}
-            <Toolbar {...toolbarProps} />
           </div>
         </div>
       ) : (

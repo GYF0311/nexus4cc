@@ -20,6 +20,8 @@ interface Props {
   onUpload?: () => void
   onUploadFile?: (file: File) => void
   runningTaskCount?: number
+  /** When true: renders as a compact sidebar section (no theme/settings, flex-wrap key grid) */
+  embedded?: boolean
 }
 
 const KEY_MAP = Object.fromEntries(ALL_KEYS.map(k => [k.id, k]))
@@ -62,7 +64,7 @@ interface DragState {
 
 const ITEM_HEIGHT = 48 // px，每行编辑项高度
 
-export default function Toolbar({ token, sendToWs, scrollToBottom, termRef: _termRef, themeMode, onToggleTheme, onOpenSettings, onOpenTasks, onUploadFile, runningTaskCount }: Props) {
+export default function Toolbar({ token, sendToWs, scrollToBottom, termRef: _termRef, themeMode, onToggleTheme, onOpenSettings, onOpenTasks, onUploadFile, runningTaskCount, embedded }: Props) {
   const [config, setConfig]           = useState<ToolbarConfig>(loadConfig)
   const [collapsed, setCollapsed]     = useState(() => {
     const saved = localStorage.getItem(COLLAPSED_KEY)
@@ -80,7 +82,6 @@ export default function Toolbar({ token, sendToWs, scrollToBottom, termRef: _ter
   const [menuPos, setMenuPos]         = useState({ bottom: 60, right: 8 })
   const menuBtnRef                    = useRef<HTMLButtonElement>(null)
   const [isPC, setIsPC]               = useState(false)
-  const [isWidePC, setIsWidePC]       = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1024)
   const rootRef = useRef<HTMLDivElement>(null)
   const editScrollRef = useRef<HTMLDivElement>(null)
   const isDraggingMouse = useRef(false)
@@ -94,7 +95,6 @@ export default function Toolbar({ token, sendToWs, scrollToBottom, termRef: _ter
   useEffect(() => {
     const checkWidth = () => {
       setIsPC(window.innerWidth >= PC_BREAKPOINT)
-      setIsWidePC(window.innerWidth >= 1024)
     }
     checkWidth()
     window.addEventListener('resize', checkWidth)
@@ -464,6 +464,45 @@ export default function Toolbar({ token, sendToWs, scrollToBottom, termRef: _ter
     document.body
   )
 
+  // ---- 嵌入侧边栏模式（PC端） ----
+  if (embedded) {
+    const allEmbedded = [...config.pinned, ...(collapsed ? [] : config.expanded)]
+    return (
+      <div ref={rootRef} style={{ borderTop: '1px solid var(--nexus-border)', flexShrink: 0 }}>
+        {/* Section header */}
+        <div style={{ display: 'flex', alignItems: 'center', padding: '5px 8px', gap: 2 }}>
+          <span style={{ fontSize: 10, color: 'var(--nexus-muted)', flex: 1, letterSpacing: 0.6, textTransform: 'uppercase' as const }}>快捷键</span>
+          <button
+            style={s.iconBtnPC}
+            onPointerDown={(e) => { e.preventDefault(); setEditing(true) }}
+            title="编辑快捷键"
+          ><Icon name="pencil" size={14} /></button>
+          <button
+            style={s.iconBtnPC}
+            onPointerDown={(e) => { e.preventDefault(); setCollapsed(v => { const n = !v; localStorage.setItem(COLLAPSED_KEY, String(n)); return n }) }}
+            title={collapsed ? '展开' : '收起'}
+          ><Icon name={collapsed ? 'chevronUp' : 'chevronDown'} size={14} /></button>
+        </div>
+        {/* Key grid */}
+        <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 3, padding: '0 8px 8px' }}>
+          {allEmbedded.map(id => {
+            const key = KEY_MAP[id]
+            if (!key) return null
+            return (
+              <button
+                key={id}
+                style={s.keyEmbedded}
+                onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); handleKey(key) }}
+                title={key.desc}
+              >{key.label}</button>
+            )
+          })}
+        </div>
+        {pasteBoxEl}
+      </div>
+    )
+  }
+
   // ---- 正常工具栏 ----
   if (isPC) {
     return (
@@ -477,8 +516,8 @@ export default function Toolbar({ token, sendToWs, scrollToBottom, termRef: _ter
           <button style={s.iconBtnPC} onPointerDown={(e) => { e.preventDefault(); onToggleTheme() }}>
             <Icon name={themeMode === 'dark' ? 'sun' : 'moon'} size={18} />
           </button>
-          {/* 固定键：宽屏折叠时隐藏，仅展开时显示 */}
-          {(!isWidePC || !collapsed) && (
+          {/* 固定键：始终显示 */}
+          {(
             <div style={s.pinnedRowPC}>
               {config.pinned.map(id => {
                 const key = KEY_MAP[id]
@@ -707,6 +746,21 @@ const s: Record<string, React.CSSProperties> = {
     minWidth: 48,
     padding: '8px 10px',
     textAlign: 'center',
+    touchAction: 'manipulation',
+    WebkitTapHighlightColor: 'transparent',
+    flexShrink: 0,
+  },
+  keyEmbedded: {
+    background: 'var(--nexus-bg2)',
+    border: '1px solid var(--nexus-border)',
+    borderRadius: 4,
+    color: 'var(--nexus-text)',
+    cursor: 'pointer',
+    fontSize: 11,
+    fontFamily: 'monospace',
+    minWidth: 30,
+    padding: '4px 5px',
+    textAlign: 'center' as const,
     touchAction: 'manipulation',
     WebkitTapHighlightColor: 'transparent',
     flexShrink: 0,
