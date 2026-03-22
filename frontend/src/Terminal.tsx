@@ -6,6 +6,7 @@ import '@xterm/xterm/css/xterm.css'
 import Toolbar from './Toolbar'
 import SessionFAB from './SessionFAB'
 import GhostShield from './GhostShield'
+import { Icon } from './icons'
 import { getWindowStatus, STATUS_DOT_COLOR, STATUS_DOT_TITLE } from './windowStatus'
 
 const SessionManager = lazy(() => import('./SessionManager'))
@@ -90,19 +91,21 @@ export function getInitialTheme(): ThemeMode {
   return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 }
 
-// 模块加载时立即初始化 CSS vars，避免首帧颜色错乱
+// 极简主题系统 — 统一的深浅色配色
 function initCssVars(mode: ThemeMode) {
   const isDark = mode === 'dark'
   const root = document.documentElement
-  root.style.setProperty('--nexus-bg', isDark ? '#16213e' : '#f1f5f9')
-  root.style.setProperty('--nexus-bg2', isDark ? '#0f3460' : '#dbeafe')
-  root.style.setProperty('--nexus-border', isDark ? '#334155' : '#cbd5e1')
-  root.style.setProperty('--nexus-text', isDark ? '#e2e8f0' : '#1e293b')
-  root.style.setProperty('--nexus-text2', isDark ? '#94a3b8' : '#475569')
-  root.style.setProperty('--nexus-muted', isDark ? '#64748b' : '#94a3b8')
-  root.style.setProperty('--nexus-tab-active', isDark ? '#0f3460' : '#dbeafe')
-  root.style.setProperty('--nexus-sheet-bg', isDark ? '#16213e' : '#f8fafc')
-  root.style.setProperty('--nexus-menu-bg', isDark ? '#1e293b' : '#ffffff')
+  root.style.setProperty('--nexus-bg',        isDark ? '#0f172a' : '#ffffff')  // 主背景
+  root.style.setProperty('--nexus-bg2',       isDark ? '#1e293b' : '#f1f5f9')  // 次级背景
+  root.style.setProperty('--nexus-menu-bg',   isDark ? '#1e293b' : '#ffffff')  // 面板/菜单
+  root.style.setProperty('--nexus-border',    isDark ? '#334155' : '#e2e8f0')  // 边框
+  root.style.setProperty('--nexus-text',      isDark ? '#f8fafc' : '#0f172a')  // 主要文字
+  root.style.setProperty('--nexus-text2',     isDark ? '#94a3b8' : '#64748b')  // 次要文字
+  root.style.setProperty('--nexus-muted',     isDark ? '#64748b' : '#94a3b8')  // 禁用/提示
+  root.style.setProperty('--nexus-tab-active',isDark ? '#334155' : '#e2e8f0')  // 激活标签
+  root.style.setProperty('--nexus-accent',    '#3b82f6')                       // 强调蓝
+  root.style.setProperty('--nexus-success',   '#22c55e')                       // 成功绿
+  root.style.setProperty('--nexus-error',     '#ef4444')                       // 错误红
 }
 initCssVars(getInitialTheme())
 
@@ -348,17 +351,18 @@ function Sidebar({
                   style={{
                     background: 'transparent',
                     border: 'none',
-                    color: '#ef4444',
+                    color: 'var(--nexus-error)',
                     cursor: 'pointer',
-                    fontSize: 14,
-                    padding: '0 2px',
+                    padding: '2px',
                     flexShrink: 0,
                     opacity: 0.7,
-                    lineHeight: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                   }}
                   onClick={(e) => { e.stopPropagation(); onClose(win.index) }}
                   title="关闭"
-                >×</button>
+                ><Icon name="x" size={14} /></button>
               </>
             )}
           </div>
@@ -399,7 +403,7 @@ function Sidebar({
             textAlign: 'left',
           }}
           onClick={onOpenTasks}
-        >📋 任务面板{runningTaskCount ? <span style={{ marginLeft: 6, background: '#22c55e', color: '#fff', borderRadius: 10, fontSize: 10, fontWeight: 700, padding: '1px 5px' }}>{runningTaskCount}</span> : null}</button>
+        ><span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Icon name="clipboard" size={16} />任务面板{runningTaskCount ? <span style={{ marginLeft: 'auto', background: 'var(--nexus-success)', color: '#fff', borderRadius: 10, fontSize: 10, fontWeight: 700, padding: '1px 5px' }}>{runningTaskCount}</span> : null}</span></button>
         <button
           style={{
             background: 'transparent',
@@ -413,7 +417,7 @@ function Sidebar({
             textAlign: 'left',
           }}
           onClick={onUpload}
-        >📎 上传文件</button>
+        ><span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Icon name="paperclip" size={16} />上传文件</span></button>
         <button
           style={{
             background: 'transparent',
@@ -427,7 +431,7 @@ function Sidebar({
             textAlign: 'left',
           }}
           onClick={onOpenSettings}
-        >⚙ 配置管理</button>
+        ><span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Icon name="settings" size={16} />配置管理</span></button>
       </div>
     </div>
   )
@@ -476,6 +480,8 @@ export default function Terminal({ token }: Props) {
   const attachWindowFnRef = useRef<(index: number) => void>(() => {})
   const [showGuide, setShowGuide] = useState(() => localStorage.getItem('nexus_guide_seen') !== 'true')
   const [isScrolledUp, setIsScrolledUp] = useState(false)
+  const toolbarWrapRef = useRef<HTMLDivElement>(null)
+  const [toolbarHeight, setToolbarHeight] = useState(0)
   const keyboardVisibleRef = useRef(false)
   const [viewportHeight, setViewportHeight] = useState<number | null>(null)
   const [drawerMenuIndex, setDrawerMenuIndex] = useState<number | null>(null)
@@ -1221,6 +1227,16 @@ export default function Terminal({ token }: Props) {
     return () => document.removeEventListener('focusin', handleFocusin)
   }, [isWidePC])
 
+  // Track toolbar height for FAB constraint
+  useEffect(() => {
+    const el = toolbarWrapRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => setToolbarHeight(el.offsetHeight))
+    ro.observe(el)
+    setToolbarHeight(el.offsetHeight)
+    return () => ro.disconnect()
+  }, [])
+
   // Overlay guard: when any overlay opens, set xterm textarea to readOnly
   // to prevent virtual keyboard from appearing when keyboard dismisses
   const anyOverlayOpen = showSessionDrawer || showTasks || showSettings || showNewSession || showScrollback
@@ -1322,7 +1338,7 @@ export default function Terminal({ token }: Props) {
             gap: 12,
           }}
         >
-          <span>📋 复制模式：长按下方文本选择复制</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Icon name="copy" size={16} />复制模式：长按下方文本选择复制</span>
           <button
             onClick={() => setSelectionMode(false)}
             style={{
@@ -1397,7 +1413,7 @@ export default function Terminal({ token }: Props) {
               </div>
             )}
             {isScrolledUp && (
-              <button style={styles.scrollBtn} onClick={scrollToBottom} title="滚到底部">↓</button>
+              <button style={styles.scrollBtn} onClick={scrollToBottom} title="滚到底部"><Icon name="arrowDown" size={16} /></button>
             )}
             <Toolbar {...toolbarProps} />
           </div>
@@ -1413,11 +1429,11 @@ export default function Terminal({ token }: Props) {
               </div>
             )}
             {isScrolledUp && (
-              <button style={styles.scrollBtn} onClick={scrollToBottom} title="滚到底部">↓</button>
+              <button style={styles.scrollBtn} onClick={scrollToBottom} title="滚到底部"><Icon name="arrowDown" size={16} /></button>
             )}
           </div>
-          <SessionFAB onClick={() => setShowSessionDrawer(true)} windowCount={windows.length} />
-          <Toolbar {...toolbarProps} />
+          <SessionFAB onClick={() => setShowSessionDrawer(true)} windowCount={windows.length} bottomInset={toolbarHeight} />
+          <div ref={toolbarWrapRef}><Toolbar {...toolbarProps} /></div>
         </div>
       )}
 
@@ -1429,7 +1445,7 @@ export default function Terminal({ token }: Props) {
           <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 401, background: 'var(--nexus-menu-bg)', borderRadius: '12px 12px 0 0', border: '1px solid var(--nexus-border)', borderBottom: 'none', maxHeight: '70vh', display: 'flex', flexDirection: 'column', boxShadow: '0 -4px 24px rgba(0,0,0,0.4)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--nexus-border)', flexShrink: 0 }}>
               <span style={{ color: 'var(--nexus-text)', fontWeight: 600, fontSize: 15 }}>会话管理</span>
-              <button style={{ background: 'transparent', border: 'none', color: 'var(--nexus-text2)', fontSize: 22, cursor: 'pointer', padding: '0 4px', lineHeight: 1 }} onPointerDown={(e) => { e.preventDefault(); setShowSessionDrawer(false); setDrawerMenuIndex(null); setDrawerRenameIndex(null); (document.activeElement as HTMLElement)?.blur() }}>×</button>
+              <button style={{ background: 'transparent', border: 'none', color: 'var(--nexus-text2)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onPointerDown={(e) => { e.preventDefault(); setShowSessionDrawer(false); setDrawerMenuIndex(null); setDrawerRenameIndex(null); (document.activeElement as HTMLElement)?.blur() }}><Icon name="x" size={20} /></button>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
               {windows.map(win => {
@@ -1466,11 +1482,11 @@ export default function Terminal({ token }: Props) {
                           onPointerUp={(e) => { e.stopPropagation(); attachToWindow(win.index); setShowSessionDrawer(false); setDrawerMenuIndex(null) }}
                         >{win.name}</span>
                       )}
-                      {isActive && !isRenaming && <span style={{ color: '#3b82f6', fontSize: 13, fontWeight: 600, flexShrink: 0 }}>✓</span>}
+                      {isActive && !isRenaming && <span style={{ color: 'var(--nexus-accent)', fontSize: 13, fontWeight: 600, flexShrink: 0, display: 'flex', alignItems: 'center' }}><Icon name="check" size={14} /></span>}
                       <button
-                        style={{ background: 'transparent', border: 'none', color: 'var(--nexus-text2)', fontSize: 18, cursor: 'pointer', padding: '0 4px', flexShrink: 0, lineHeight: 1 }}
+                        style={{ background: 'transparent', border: 'none', color: 'var(--nexus-text2)', cursor: 'pointer', padding: '4px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                         onPointerDown={e => { e.stopPropagation(); setDrawerMenuIndex(isMenuOpen ? null : win.index); setDrawerRenameIndex(null) }}
-                      >⋯</button>
+                      ><Icon name="more" size={18} /></button>
                     </div>
                     {/* Action row */}
                     {isMenuOpen && !isRenaming && (
@@ -1478,11 +1494,11 @@ export default function Terminal({ token }: Props) {
                         <button
                           style={{ flex: 1, background: 'transparent', border: '1px solid var(--nexus-border)', borderRadius: 6, color: 'var(--nexus-text)', fontSize: 13, padding: '7px 0', cursor: 'pointer' }}
                           onPointerDown={e => { e.stopPropagation(); setDrawerRenameValue(win.name); setDrawerRenameIndex(win.index); setDrawerMenuIndex(null) }}
-                        >✎ 改名</button>
+                        ><span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}><Icon name="pencil" size={14} />改名</span></button>
                         <button
                           style={{ flex: 1, background: 'transparent', border: '1px solid #ef4444', borderRadius: 6, color: '#ef4444', fontSize: 13, padding: '7px 0', cursor: 'pointer' }}
                           onPointerDown={e => { e.stopPropagation(); closeWindow(win.index); setDrawerMenuIndex(null); if (windows.length <= 1) setShowSessionDrawer(false) }}
-                        >✕ 关闭</button>
+                        ><span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}><Icon name="x" size={14} />关闭</span></button>
                       </div>
                     )}
                   </div>
@@ -1498,7 +1514,7 @@ export default function Terminal({ token }: Props) {
                   style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', cursor: 'pointer', background: sess === activeTmuxSession ? 'var(--nexus-tab-active)' : 'transparent' }}
                   onClick={() => { handleSwitchSession(sess); setShowSessionDrawer(false) }}
                 >
-                  <span style={{ color: sess === activeTmuxSession ? '#3b82f6' : 'var(--nexus-text2)', fontSize: 13 }}>{sess === activeTmuxSession ? '✓ ' : '  '}{sess}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: sess === activeTmuxSession ? 'var(--nexus-accent)' : 'var(--nexus-text2)', fontSize: 13 }}>{sess === activeTmuxSession ? <Icon name="check" size={14} /> : <span style={{ width: 14 }} />}{sess}</span>
                 </div>
               ))}
             </div>
@@ -1569,8 +1585,8 @@ export default function Terminal({ token }: Props) {
             <ul style={{ color: 'var(--nexus-text2)', lineHeight: 1.9, fontSize: 13, paddingLeft: 20, margin: '8px 0' }}>
               <li>黑色区域是终端，点击聚焦后可键盘输入</li>
               <li>底部工具栏提供 Esc/Tab/^C 等快捷键</li>
-              <li>📋 任务面板：后台发送 claude -p 任务</li>
-              <li>📎 上传图片/文件到当前 session 目录</li>
+              <li style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Icon name="clipboard" size={14} />任务面板：后台发送 claude -p 任务</li>
+              <li style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Icon name="paperclip" size={14} />上传图片/文件到当前 session 目录</li>
               <li>长按标签可重命名或关闭会话</li>
             </ul>
             <p style={{ color: 'var(--nexus-muted)', fontSize: 11, marginTop: 8 }}>
@@ -1582,7 +1598,7 @@ export default function Terminal({ token }: Props) {
                 localStorage.setItem('nexus_guide_seen', 'true')
               }}
               style={{
-                background: '#3b82f6',
+                background: 'var(--nexus-accent)',
                 border: 'none',
                 borderRadius: 6,
                 color: '#fff',
@@ -1629,9 +1645,9 @@ export default function Terminal({ token }: Props) {
               <span style={{ color: termFg, fontWeight: 600, fontSize: termFontSize, fontFamily: termFontFamily }}>历史记录</span>
               <span style={{ color: termMuted, fontSize: termFontSize * 0.75, flex: 1, textAlign: 'center', fontFamily: termFontFamily }}>滚到底部返回终端</span>
               <button
-                style={{ background: 'transparent', border: 'none', color: termMuted, fontSize: 22, cursor: 'pointer', padding: '0 4px', lineHeight: 1 }}
+                style={{ background: 'transparent', border: 'none', color: termMuted, cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 onClick={closeScrollback}
-              >×</button>
+              ><Icon name="x" size={20} /></button>
             </div>
             <div
               ref={scrollbackOverlayRef}

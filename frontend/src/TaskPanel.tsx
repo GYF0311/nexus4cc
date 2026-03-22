@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import GhostShield from './GhostShield'
+import { Icon } from './icons'
 
 interface Task {
   id: string
@@ -143,8 +144,8 @@ export default function TaskPanel({ token, windows, activeWindowName, tmuxSessio
       <div style={s.panel}>
         {/* Header */}
         <div style={s.header}>
-          <span style={s.title}>📋 任务面板</span>
-          <button style={s.closeBtn} onClick={onClose}>×</button>
+          <span style={{...s.title, display: 'flex', alignItems: 'center', gap: 8}}><Icon name="clipboard" size={20} />任务面板</span>
+          <button style={{...s.closeBtn, display: 'flex', alignItems: 'center', justifyContent: 'center'}} onClick={onClose}><Icon name="x" size={20} /></button>
         </div>
 
         {/* Session selector */}
@@ -182,7 +183,7 @@ export default function TaskPanel({ token, windows, activeWindowName, tmuxSessio
                 style={{ ...s.sendBtn, background: '#ef4444' }}
                 onClick={() => abortRef.current?.abort()}
               >
-                ✕ 取消
+                <Icon name="x" size={14} /> 取消
               </button>
             )}
             <button
@@ -231,7 +232,7 @@ export default function TaskPanel({ token, windows, activeWindowName, tmuxSessio
                     <span style={s.taskPrompt} title={task.prompt}>{task.prompt.slice(0, 60)}{task.prompt.length > 60 ? '...' : ''}</span>
                     {task.source === 'telegram' && <span style={s.sourceBadge}>TG</span>}
                     <span style={s.taskSession}>{task.session_name}</span>
-                    <button style={s.deleteBtn} onClick={(e) => deleteTask(task.id, e)} title="删除">✕</button>
+                    <button style={{...s.deleteBtn, display: 'flex', alignItems: 'center', justifyContent: 'center'}} onClick={(e) => deleteTask(task.id, e)} title="删除"><Icon name="x" size={14} /></button>
                   </div>
                 ))}
               </div>

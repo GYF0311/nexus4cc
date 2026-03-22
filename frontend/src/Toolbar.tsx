@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import GhostShield from './GhostShield'
 import useOverlayGuard from './useOverlayGuard'
+import { Icon } from './icons'
 import type { Terminal } from '@xterm/xterm'
 import { KeyDef, ToolbarConfig, ALL_KEYS, FACTORY_CONFIG } from './toolbarDefaults'
 import type { ThemeMode } from './Terminal'
@@ -87,7 +88,6 @@ export default function Toolbar({ token, sendToWs, scrollToBottom, termRef: _ter
   useOverlayGuard(_termRef, editing)
 
   const existsUserDefault = !!localStorage.getItem(USER_DEFAULT_KEY)
-  const tc = toolbarColors(themeMode)
 
   // 检测 PC/移动端
   useEffect(() => {
@@ -253,7 +253,7 @@ export default function Toolbar({ token, sendToWs, scrollToBottom, termRef: _ter
           return (
             <button
               key={id}
-              style={{...(isPC ? s.keyPC : s.key), background: tc.keyBg, color: tc.keyColor, borderColor: tc.border}}
+              style={isPC ? s.keyPC : s.key}
               onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); handleKey(key) }}
             >
               {key.label}
@@ -280,7 +280,7 @@ export default function Toolbar({ token, sendToWs, scrollToBottom, termRef: _ter
             <button onPointerDown={(e) => { e.preventDefault(); resetConfig() }} style={isPC ? s.editBtnSmPC : s.editBtnSm}>重置</button>
             <button
               onPointerDown={(e) => { e.preventDefault(); saveAsDefault() }}
-              style={savedFlash ? { ...(isPC ? s.editBtnSmPC : s.editBtnSm), color: '#4ade80', borderColor: '#4ade80' } : (isPC ? s.editBtnSmPC : s.editBtnSm)}
+              style={savedFlash ? { ...(isPC ? s.editBtnSmPC : s.editBtnSm), color: 'var(--nexus-success)', borderColor: 'var(--nexus-success)' } : (isPC ? s.editBtnSmPC : s.editBtnSm)}
             >
               {savedFlash ? '已保存' : '存为默认'}
             </button>
@@ -293,7 +293,7 @@ export default function Toolbar({ token, sendToWs, scrollToBottom, termRef: _ter
           {(['pinned', 'expanded'] as const).map(section => (
             <div key={section} style={s.editSection}>
               <div style={isPC ? s.editSectionTitlePC : s.editSectionTitle}>
-                {section === 'pinned' ? '📌 固定行（始终显示）' : '📂 展开区'}
+                {section === 'pinned' ? '固定行（始终显示）' : '展开区'}
               </div>
               {getDisplayIds(section).map((id, idx) => {
                 const key = KEY_MAP[id]
@@ -305,14 +305,13 @@ export default function Toolbar({ token, sendToWs, scrollToBottom, termRef: _ter
                     key={id}
                     style={{
                       ...(isPC ? s.editRowPC : s.editRow),
-                      borderBottomColor: tc.editRowBorder,
                       ...(isDragging ? s.editRowTarget : {}),
                       ...(isSource   ? s.editRowSource : {}),
                     }}
                   >
                     {/* 拖拽手柄 */}
                     <div
-                      style={{...s.dragHandle, color: tc.handleColor}}
+                      style={s.dragHandle}
                       onTouchStart={(e) => { e.stopPropagation(); onDragStart(section, idx, e.touches[0].clientY) }}
                       onTouchMove={(e) => { e.stopPropagation(); onDragMove(e.touches[0].clientY) }}
                       onTouchEnd={() => onDragEnd()}
@@ -322,15 +321,16 @@ export default function Toolbar({ token, sendToWs, scrollToBottom, termRef: _ter
                         onDragStart(section, idx, e.clientY)
                       }}
                     >
-                      ☰
+                      <Icon name="grip" size={16} />
                     </div>
                     <span style={isPC ? s.editLabelPC : s.editLabel}>{key.label}</span>
                     <span style={isPC ? s.editDescPC : s.editDesc}>{key.desc}</span>
                     <button
-                      style={isPC ? s.removeBtnPC : s.removeBtn}
+                      style={{ ...(isPC ? s.removeBtnPC : s.removeBtn), display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                       onPointerDown={(e) => { e.preventDefault(); removeKey(section, id) }}
+                      title="移除"
                     >
-                      ×
+                      <Icon name="x" size={14} />
                     </button>
                   </div>
                 )
@@ -341,9 +341,9 @@ export default function Toolbar({ token, sendToWs, scrollToBottom, termRef: _ter
           {/* 可添加 */}
           {availableKeys.length > 0 && (
             <div style={s.editSection}>
-              <div style={isPC ? s.editSectionTitlePC : s.editSectionTitle}>➕ 可添加</div>
+              <div style={isPC ? s.editSectionTitlePC : s.editSectionTitle}>可添加</div>
               {availableKeys.map(key => (
-                <div key={key.id} style={{...(isPC ? s.editRowPC : s.editRow), borderBottomColor: tc.editRowBorder}}>
+                <div key={key.id} style={isPC ? s.editRowPC : s.editRow}>
                   <span style={isPC ? s.editLabelPC : s.editLabel}>{key.label}</span>
                   <span style={isPC ? s.editDescPC : s.editDesc}>{key.desc}</span>
                   <div style={{ display: 'flex', gap: 4, marginLeft: 'auto', flexShrink: 0 }}>
@@ -362,7 +362,7 @@ export default function Toolbar({ token, sendToWs, scrollToBottom, termRef: _ter
       return (
         <div style={s.desktopOverlay}>
           <GhostShield />
-          <div ref={rootRef} style={{...s.desktopEditPanel, background: tc.editBg, borderColor: tc.border}}>
+          <div ref={rootRef} style={s.desktopEditPanel}>
             {editContent}
           </div>
         </div>
@@ -370,7 +370,7 @@ export default function Toolbar({ token, sendToWs, scrollToBottom, termRef: _ter
     }
 
     return (
-      <div ref={rootRef} style={{...s.editPanel, background: tc.editBg, borderTopColor: tc.border}}>
+      <div ref={rootRef} style={s.editPanel}>
         <GhostShield />
         {editContent}
       </div>
@@ -380,41 +380,35 @@ export default function Toolbar({ token, sendToWs, scrollToBottom, termRef: _ter
   // ---- 正常工具栏 ----
   if (isPC) {
     return (
-      <div ref={rootRef} style={{...s.containerPC, background: tc.bg, borderTopColor: tc.border}}>
+      <div ref={rootRef} style={s.containerPC}>
         {/* PC: 控制按钮 + 固定键同一行 */}
         <div style={s.topBarPC}>
-          <button style={{...s.iconBtnPC, color: tc.iconColor}} onPointerDown={(e) => { e.preventDefault(); setCollapsed(v => { const n = !v; localStorage.setItem(COLLAPSED_KEY, String(n)); return n }) }}>
-            {collapsed ? '▲' : '▼'}
+          <button style={s.iconBtnPC} onPointerDown={(e) => { e.preventDefault(); setCollapsed(v => { const n = !v; localStorage.setItem(COLLAPSED_KEY, String(n)); return n }) }}>
+            <Icon name={collapsed ? 'chevronUp' : 'chevronDown'} size={18} />
           </button>
-          <button style={{...s.iconBtnPC, color: tc.iconColor}} onPointerDown={(e) => { e.preventDefault(); setEditing(true) }}>✏</button>
-          <button style={{...s.iconBtnPC, color: tc.iconColor}} onPointerDown={(e) => { e.preventDefault(); onToggleTheme() }}>
-            {themeMode === 'dark' ? '☀' : '☾'}
+          <button style={s.iconBtnPC} onPointerDown={(e) => { e.preventDefault(); setEditing(true) }}><Icon name="pencil" size={18} /></button>
+          <button style={s.iconBtnPC} onPointerDown={(e) => { e.preventDefault(); onToggleTheme() }}>
+            <Icon name={themeMode === 'dark' ? 'sun' : 'moon'} size={18} />
           </button>
           <button
             style={selectionMode ? s.copyBtnActivePC : s.copyBtnPC}
             onPointerDown={(e) => { e.preventDefault(); onToggleSelectionMode() }}
             title={selectionMode ? '退出复制模式' : '进入复制模式'}
           >
-            {selectionMode ? (
-            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-          ) : (
-            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
-          )}
+            <Icon name={selectionMode ? 'check' : 'copy'} size={16} />
           </button>
           {onOpenSettings && (
-            <button style={{...s.iconBtnPC, color: tc.iconColor}} onPointerDown={(e) => { e.preventDefault(); onOpenSettings() }} title="设置">
-              ⚙
+            <button style={s.iconBtnPC} onPointerDown={(e) => { e.preventDefault(); onOpenSettings() }} title="设置">
+              <Icon name="settings" size={18} />
             </button>
           )}
           {onOpenScrollback && (
             <button
-              style={{...s.iconBtnPC, color: tc.iconColor}}
+              style={s.iconBtnPC}
               onPointerDown={(e) => { e.preventDefault(); onOpenScrollback() }}
               title="查看历史"
             >
-              <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
-                <path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/>
-              </svg>
+              <Icon name="history" size={18} />
             </button>
           )}
           {/* 固定键：宽屏折叠时隐藏，仅展开时显示 */}
@@ -426,7 +420,7 @@ export default function Toolbar({ token, sendToWs, scrollToBottom, termRef: _ter
                 return (
                   <button
                     key={id}
-                    style={{...s.keyPC, background: tc.keyBg, color: tc.keyColor, borderColor: tc.border}}
+                    style={s.keyPC}
                     onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); handleKey(key) }}
                   >
                     {key.label}
@@ -447,7 +441,7 @@ export default function Toolbar({ token, sendToWs, scrollToBottom, termRef: _ter
                   return (
                     <button
                       key={id}
-                      style={{...s.keyPC, background: tc.keyBg, color: tc.keyColor, borderColor: tc.border}}
+                      style={s.keyPC}
                       onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); handleKey(key) }}
                     >
                       {key.label}
@@ -463,27 +457,23 @@ export default function Toolbar({ token, sendToWs, scrollToBottom, termRef: _ter
   }
 
   return (
-    <div ref={rootRef} style={{...s.container, background: tc.bg, borderTopColor: tc.border}}>
+    <div ref={rootRef} style={s.container}>
       <div style={s.topBar}>
-        <button style={{...s.iconBtn, color: tc.iconColor}} onPointerDown={(e) => { e.preventDefault(); setCollapsed(v => { const n = !v; localStorage.setItem(COLLAPSED_KEY, String(n)); return n }) }}>
-          {collapsed ? '▲' : '▼'}
+        <button style={s.iconBtn} onPointerDown={(e) => { e.preventDefault(); setCollapsed(v => { const n = !v; localStorage.setItem(COLLAPSED_KEY, String(n)); return n }) }}>
+          <Icon name={collapsed ? 'chevronUp' : 'chevronDown'} size={18} />
         </button>
         <button
           style={selectionMode ? s.copyBtnActive : s.copyBtn}
           onPointerDown={(e) => { e.preventDefault(); onToggleSelectionMode() }}
           title={selectionMode ? '退出复制模式' : '进入复制模式'}
         >
-          {selectionMode ? (
-            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-          ) : (
-            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
-          )}
+          <Icon name={selectionMode ? 'check' : 'copy'} size={16} />
         </button>
-        {/* ⚙ quick menu */}
+        {/* quick menu */}
         <div style={{ position: 'relative' }}>
           <button
             ref={menuBtnRef}
-            style={{...s.iconBtn, color: tc.iconColor}}
+            style={s.iconBtn}
             onPointerDown={(e) => {
               e.preventDefault()
               if (!showQuickMenu) {
@@ -493,29 +483,29 @@ export default function Toolbar({ token, sendToWs, scrollToBottom, termRef: _ter
               setShowQuickMenu(v => !v)
             }}
             title="更多"
-          ><svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg></button>
+          ><Icon name="settings" size={18} /></button>
           {showQuickMenu && createPortal(
             <>
               <GhostShield />
               <div style={{ position: 'fixed', inset: 0, zIndex: 300 }} onPointerDown={() => setShowQuickMenu(false)} />
               <div style={{ position: 'fixed', bottom: menuPos.bottom, right: menuPos.right, background: 'var(--nexus-menu-bg)', border: '1px solid var(--nexus-border)', borderRadius: 8, padding: '4px 0', minWidth: 160, zIndex: 400, boxShadow: '0 -4px 16px rgba(0,0,0,0.3)' }}>
                 <button style={s.quickMenuItem} onPointerDown={(e) => { e.preventDefault(); onToggleTheme(); setShowQuickMenu(false) }}>
-                  <span style={{ width: 18 }}>{themeMode === 'dark' ? '☀' : '☾'}</span>
+                  <Icon name={themeMode === 'dark' ? 'sun' : 'moon'} size={16} />
                   <span>{themeMode === 'dark' ? '切换亮色' : '切换暗色'}</span>
                 </button>
                 <button style={s.quickMenuItem} onPointerDown={(e) => { e.preventDefault(); setEditing(true); setShowQuickMenu(false) }}>
-                  <span style={{ width: 18 }}>✏</span><span>编辑快捷键</span>
+                  <Icon name="pencil" size={16} /><span>编辑快捷键</span>
                 </button>
                 {onOpenTasks && (
                   <button style={s.quickMenuItem} onPointerDown={(e) => { e.preventDefault(); onOpenTasks(); setShowQuickMenu(false) }}>
-                    <span style={{ width: 18 }}>📋</span>
+                    <Icon name="clipboard" size={16} />
                     <span>任务面板</span>
-                    {!!runningTaskCount && <span style={{ marginLeft: 'auto', background: '#22c55e', color: '#fff', borderRadius: 8, padding: '1px 6px', fontSize: 11 }}>{runningTaskCount}</span>}
+                    {!!runningTaskCount && <span style={{ marginLeft: 'auto', background: 'var(--nexus-success)', color: '#fff', borderRadius: 8, padding: '1px 6px', fontSize: 11 }}>{runningTaskCount}</span>}
                   </button>
                 )}
                 {onUpload && (
                   <button style={s.quickMenuItem} onPointerDown={(e) => { e.preventDefault(); onUpload(); setShowQuickMenu(false) }}>
-                    <span style={{ width: 18 }}>📎</span><span>上传文件</span>
+                    <Icon name="paperclip" size={16} /><span>上传文件</span>
                   </button>
                 )}
               </div>
@@ -525,13 +515,11 @@ export default function Toolbar({ token, sendToWs, scrollToBottom, termRef: _ter
         </div>
         {onOpenScrollback && (
           <button
-            style={{...s.iconBtn, color: tc.iconColor}}
+            style={s.iconBtn}
             onPointerDown={(e) => { e.preventDefault(); onOpenScrollback() }}
             title="查看历史"
           >
-            <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
-              <path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/>
-            </svg>
+            <Icon name="history" size={18} />
           </button>
         )}
       </div>
@@ -548,7 +536,7 @@ export default function Toolbar({ token, sendToWs, scrollToBottom, termRef: _ter
                 return (
                   <button
                     key={id}
-                    style={{...s.key, background: tc.keyBg, color: tc.keyColor, borderColor: tc.border}}
+                    style={s.key}
                     onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); handleKey(key) }}
                   >
                     {key.label}
@@ -569,30 +557,16 @@ function chunk<T>(arr: T[], n: number): T[][] {
   return out
 }
 
-function toolbarColors(themeMode: ThemeMode) {
-  const isDark = themeMode === 'dark'
-  return {
-    bg: isDark ? '#16213e' : '#f1f5f9',
-    border: isDark ? '#334155' : '#cbd5e1',
-    keyBg: isDark ? '#0f3460' : '#e2e8f0',
-    keyColor: isDark ? '#e2e8f0' : '#1e293b',
-    iconColor: isDark ? '#64748b' : '#475569',
-    editBg: isDark ? '#16213e' : '#f8fafc',
-    editRowBorder: isDark ? '#1e293b' : '#e2e8f0',
-    handleColor: isDark ? '#475569' : '#94a3b8',
-  }
-}
-
 const s: Record<string, React.CSSProperties> = {
   container: {
-    background: '#16213e',
-    borderTop: '1px solid #334155',
+    background: 'var(--nexus-bg)',
+    borderTop: '1px solid var(--nexus-border)',
     userSelect: 'none',
     flexShrink: 0,
   },
   containerPC: {
-    background: '#16213e',
-    borderTop: '1px solid #334155',
+    background: 'var(--nexus-bg)',
+    borderTop: '1px solid var(--nexus-border)',
     userSelect: 'none',
     flexShrink: 0,
     width: '100%',
@@ -634,6 +608,9 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: 14,
     padding: '4px 8px',
     borderRadius: 4,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   copyBtn: {
     background: 'transparent',
@@ -651,31 +628,14 @@ const s: Record<string, React.CSSProperties> = {
     background: 'rgba(59,130,246,0.15)',
     border: 'none',
     borderRadius: 4,
-    color: '#3b82f6',
+    color: 'var(--nexus-accent)',
     cursor: 'pointer',
     fontSize: 12,
     padding: '4px 10px',
     fontWeight: 500,
-  },
-  sessionsBtn: {
-    background: 'transparent',
-    border: '1px solid #334155',
-    borderRadius: 4,
-    color: '#93c5fd',
-    cursor: 'pointer',
-    fontSize: 11,
-    padding: '2px 8px',
-    marginLeft: 'auto',
-  },
-  sessionsBtnPC: {
-    background: 'transparent',
-    border: '1px solid #334155',
-    borderRadius: 4,
-    color: '#93c5fd',
-    cursor: 'pointer',
-    fontSize: 13,
-    padding: '4px 12px',
-    marginLeft: 'auto',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   row: {
     display: 'flex',
@@ -692,10 +652,10 @@ const s: Record<string, React.CSSProperties> = {
   expandedRows: { paddingBottom: 4 },
   expandedRowsPC: { paddingBottom: 8 },
   key: {
-    background: '#0f3460',
-    border: '1px solid #334155',
+    background: 'var(--nexus-bg2)',
+    border: '1px solid var(--nexus-border)',
     borderRadius: 6,
-    color: '#e2e8f0',
+    color: 'var(--nexus-text)',
     cursor: 'pointer',
     fontSize: 12,
     fontFamily: 'monospace',
@@ -707,10 +667,10 @@ const s: Record<string, React.CSSProperties> = {
     flexShrink: 0,
   },
   keyPC: {
-    background: '#0f3460',
-    border: '1px solid #334155',
+    background: 'var(--nexus-bg2)',
+    border: '1px solid var(--nexus-border)',
     borderRadius: 6,
-    color: '#e2e8f0',
+    color: 'var(--nexus-text)',
     cursor: 'pointer',
     fontSize: 14,
     fontFamily: 'monospace',
@@ -723,8 +683,8 @@ const s: Record<string, React.CSSProperties> = {
   },
   // ---- 编辑面板 ----
   editPanel: {
-    background: '#16213e',
-    borderTop: '1px solid #334155',
+    background: 'var(--nexus-bg)',
+    borderTop: '1px solid var(--nexus-border)',
     flexShrink: 0,
     display: 'flex',
     flexDirection: 'column',
@@ -745,7 +705,8 @@ const s: Record<string, React.CSSProperties> = {
     padding: '20px',
   },
   desktopEditPanel: {
-    background: '#16213e',
+    background: 'var(--nexus-bg)',
+    border: '1px solid var(--nexus-border)',
     borderRadius: 12,
     flexShrink: 0,
     display: 'flex',
@@ -761,7 +722,7 @@ const s: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: '8px 10px',
-    borderBottom: '1px solid #334155',
+    borderBottom: '1px solid var(--nexus-border)',
     flexShrink: 0,
   },
   editHeaderPC: {
@@ -769,27 +730,29 @@ const s: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: '16px 20px',
-    borderBottom: '1px solid #334155',
+    borderBottom: '1px solid var(--nexus-border)',
     flexShrink: 0,
   },
-  editTitle: { color: '#e2e8f0', fontSize: 14, fontWeight: 600 },
-  editTitlePC: { color: '#e2e8f0', fontSize: 16, fontWeight: 600 },
-  editHint: { color: '#475569', fontSize: 10, marginTop: 2 },
-  editHintPC: { color: '#475569', fontSize: 12, marginTop: 4 },
+  editTitle: { color: 'var(--nexus-text)', fontSize: 14, fontWeight: 600 },
+  editTitlePC: { color: 'var(--nexus-text)', fontSize: 16, fontWeight: 600 },
+  editHint: { color: 'var(--nexus-muted)', fontSize: 10, marginTop: 2 },
+  editHintPC: { color: 'var(--nexus-muted)', fontSize: 12, marginTop: 4 },
   editScroll: { overflowY: 'auto', flex: 1 },
   editScrollPC: { overflowY: 'auto', flex: 1, padding: '8px 0' },
   editSection: { marginBottom: 4 },
   editSectionTitle: {
-    color: '#64748b',
+    color: 'var(--nexus-text2)',
     fontSize: 11,
     padding: '6px 10px 3px',
     letterSpacing: 0.5,
+    textTransform: 'uppercase' as const,
   },
   editSectionTitlePC: {
-    color: '#64748b',
+    color: 'var(--nexus-text2)',
     fontSize: 12,
     padding: '10px 20px 6px',
     letterSpacing: 0.5,
+    textTransform: 'uppercase' as const,
   },
   editRow: {
     display: 'flex',
@@ -797,7 +760,7 @@ const s: Record<string, React.CSSProperties> = {
     padding: '0 10px',
     height: ITEM_HEIGHT,
     gap: 8,
-    borderBottom: '1px solid #1e293b',
+    borderBottom: '1px solid var(--nexus-border)',
     boxSizing: 'border-box',
   },
   editRowPC: {
@@ -806,40 +769,42 @@ const s: Record<string, React.CSSProperties> = {
     padding: '0 20px',
     height: ITEM_HEIGHT,
     gap: 12,
-    borderBottom: '1px solid #1e293b',
+    borderBottom: '1px solid var(--nexus-border)',
     boxSizing: 'border-box',
   },
   editRowTarget: {
-    background: '#1e3a5f',
-    borderColor: '#3b82f6',
+    background: 'rgba(59,130,246,0.1)',
+    borderColor: 'var(--nexus-accent)',
   },
   editRowSource: {
     opacity: 0.35,
   },
   dragHandle: {
-    color: '#475569',
+    color: 'var(--nexus-text2)',
     fontSize: 16,
     cursor: 'grab',
     padding: '8px 4px',
     flexShrink: 0,
     touchAction: 'none',
+    display: 'flex',
+    alignItems: 'center',
   },
   editLabel: {
-    color: '#e2e8f0',
+    color: 'var(--nexus-text)',
     fontFamily: 'monospace',
     fontSize: 13,
     minWidth: 48,
     flexShrink: 0,
   },
   editLabelPC: {
-    color: '#e2e8f0',
+    color: 'var(--nexus-text)',
     fontFamily: 'monospace',
     fontSize: 14,
     minWidth: 60,
     flexShrink: 0,
   },
   editDesc: {
-    color: '#64748b',
+    color: 'var(--nexus-text2)',
     fontSize: 11,
     flex: 1,
     overflow: 'hidden',
@@ -847,7 +812,7 @@ const s: Record<string, React.CSSProperties> = {
     whiteSpace: 'nowrap',
   },
   editDescPC: {
-    color: '#64748b',
+    color: 'var(--nexus-text2)',
     fontSize: 12,
     flex: 1,
     overflow: 'hidden',
@@ -857,7 +822,7 @@ const s: Record<string, React.CSSProperties> = {
   removeBtn: {
     background: 'transparent',
     border: 'none',
-    color: '#ef4444',
+    color: 'var(--nexus-error)',
     cursor: 'pointer',
     fontSize: 18,
     padding: '0 2px',
@@ -867,7 +832,7 @@ const s: Record<string, React.CSSProperties> = {
   removeBtnPC: {
     background: 'transparent',
     border: 'none',
-    color: '#ef4444',
+    color: 'var(--nexus-error)',
     cursor: 'pointer',
     fontSize: 20,
     padding: '4px 8px',
@@ -875,43 +840,43 @@ const s: Record<string, React.CSSProperties> = {
     lineHeight: 1,
   },
   addBtn: {
-    background: '#0f3460',
-    border: '1px solid #334155',
+    background: 'var(--nexus-bg2)',
+    border: '1px solid var(--nexus-border)',
     borderRadius: 4,
-    color: '#93c5fd',
+    color: 'var(--nexus-accent)',
     cursor: 'pointer',
     fontSize: 11,
     padding: '4px 8px',
   },
   addBtnPC: {
-    background: '#0f3460',
-    border: '1px solid #334155',
+    background: 'var(--nexus-bg2)',
+    border: '1px solid var(--nexus-border)',
     borderRadius: 4,
-    color: '#93c5fd',
+    color: 'var(--nexus-accent)',
     cursor: 'pointer',
     fontSize: 12,
     padding: '6px 12px',
   },
   editBtnSm: {
     background: 'transparent',
-    border: '1px solid #334155',
+    border: '1px solid var(--nexus-border)',
     borderRadius: 4,
-    color: '#64748b',
+    color: 'var(--nexus-text2)',
     cursor: 'pointer',
     fontSize: 12,
     padding: '4px 10px',
   },
   editBtnSmPC: {
     background: 'transparent',
-    border: '1px solid #334155',
+    border: '1px solid var(--nexus-border)',
     borderRadius: 4,
-    color: '#64748b',
+    color: 'var(--nexus-text2)',
     cursor: 'pointer',
     fontSize: 13,
     padding: '6px 14px',
   },
   editBtnPrimary: {
-    background: '#3b82f6',
+    background: 'var(--nexus-accent)',
     border: 'none',
     borderRadius: 4,
     color: '#fff',
@@ -921,7 +886,7 @@ const s: Record<string, React.CSSProperties> = {
     padding: '4px 12px',
   },
   editBtnPrimaryPC: {
-    background: '#3b82f6',
+    background: 'var(--nexus-accent)',
     border: 'none',
     borderRadius: 4,
     color: '#fff',
@@ -934,12 +899,15 @@ const s: Record<string, React.CSSProperties> = {
   iconBtnPC: {
     background: 'transparent',
     border: 'none',
-    color: '#64748b',
+    color: 'var(--nexus-text2)',
     cursor: 'pointer',
     fontSize: 13,
     padding: '3px 6px',
     borderRadius: 4,
     flexShrink: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   copyBtnPC: {
     background: 'transparent',
@@ -950,17 +918,23 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: 13,
     padding: '4px 8px',
     flexShrink: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   copyBtnActivePC: {
     background: 'rgba(59,130,246,0.15)',
-    border: '1px solid #3b82f6',
+    border: '1px solid var(--nexus-accent)',
     borderRadius: 4,
-    color: '#3b82f6',
+    color: 'var(--nexus-accent)',
     cursor: 'pointer',
     fontSize: 13,
     padding: '4px 8px',
     fontWeight: 600,
     flexShrink: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   pinnedRowPC: {
     display: 'flex',

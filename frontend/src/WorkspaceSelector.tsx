@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import GhostShield from './GhostShield'
+import { Icon } from './icons'
 
 interface Workspace {
   name: string
@@ -115,7 +116,7 @@ export default function WorkspaceSelector({ token, onClose, onConfirm }: Props) 
         {/* 顶部：标题 + 关闭 */}
         <div style={s.header}>
           <span style={s.title}>选择工作目录</span>
-          <button style={s.closeBtn} onPointerDown={onClose}>×</button>
+          <button style={{...s.closeBtn, display: 'flex', alignItems: 'center', justifyContent: 'center'}} onPointerDown={onClose}><Icon name="x" size={20} /></button>
         </div>
 
         {/* 内容区域 */}
@@ -233,45 +234,45 @@ export default function WorkspaceSelector({ token, onClose, onConfirm }: Props) 
 const s: Record<string, React.CSSProperties> = {
   // 移动端样式（默认）
   overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', zIndex: 100 },
-  panel: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: '#0f172a', display: 'flex', flexDirection: 'column', color: '#e2e8f0' },
+  panel: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'var(--nexus-bg)', display: 'flex', flexDirection: 'column', color: 'var(--nexus-text)' },
 
   // PC 端样式
   desktopOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' },
-  desktopPanel: { background: '#0f172a', borderRadius: 12, display: 'flex', flexDirection: 'column', color: '#e2e8f0', width: '100%', maxWidth: 600, maxHeight: '85vh', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', overflow: 'hidden' },
+  desktopPanel: { background: 'var(--nexus-bg)', border: '1px solid var(--nexus-border)', borderRadius: 12, display: 'flex', flexDirection: 'column', color: 'var(--nexus-text)', width: '100%', maxWidth: 600, maxHeight: '85vh', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', overflow: 'hidden' },
 
-  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid #334155', flexShrink: 0 },
+  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--nexus-border)', flexShrink: 0 },
   title: { fontSize: 16, fontWeight: 600 },
-  closeBtn: { background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 24, lineHeight: 1, padding: '0 4px' },
+  closeBtn: { background: 'transparent', border: 'none', color: 'var(--nexus-text2)', cursor: 'pointer', fontSize: 24, lineHeight: 1, padding: '0 4px' },
   scrollArea: { flex: 1, overflowY: 'auto', padding: '8px 0' },
-  section: { padding: '12px 16px', borderBottom: '1px solid #1e293b' },
+  section: { padding: '12px 16px', borderBottom: '1px solid var(--nexus-border)' },
   sectionHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  sectionTitle: { fontSize: 11, color: '#64748b', letterSpacing: 0.5, textTransform: 'uppercase' as const, marginBottom: 8 },
-  selectedPath: { fontSize: 14, color: '#93c5fd', fontFamily: 'monospace', padding: '8px 12px', background: '#1e293b', borderRadius: 6, wordBreak: 'break-all' as const },
-  refreshBtn: { background: 'transparent', border: '1px solid #334155', borderRadius: 4, color: '#94a3b8', cursor: 'pointer', fontSize: 11, padding: '2px 8px' },
-  errorMsg: { color: '#f87171', fontSize: 12, marginBottom: 8 },
-  emptyMsg: { color: '#475569', fontSize: 13, padding: '8px 0' },
-  hint: { color: '#64748b', fontSize: 11, marginTop: 6 },
+  sectionTitle: { fontSize: 11, color: 'var(--nexus-text2)', letterSpacing: 0.5, textTransform: 'uppercase' as const, marginBottom: 8 },
+  selectedPath: { fontSize: 14, color: 'var(--nexus-accent)', fontFamily: 'monospace', padding: '8px 12px', background: 'var(--nexus-bg2)', borderRadius: 6, wordBreak: 'break-all' as const },
+  refreshBtn: { background: 'transparent', border: '1px solid var(--nexus-border)', borderRadius: 4, color: 'var(--nexus-text2)', cursor: 'pointer', fontSize: 11, padding: '2px 8px' },
+  errorMsg: { color: 'var(--nexus-error)', fontSize: 12, marginBottom: 8 },
+  emptyMsg: { color: 'var(--nexus-muted)', fontSize: 13, padding: '8px 0' },
+  hint: { color: 'var(--nexus-muted)', fontSize: 11, marginTop: 6 },
   radioGroup: { display: 'flex', flexDirection: 'column' as const, gap: 10 },
-  radioLabel: { display: 'flex', alignItems: 'center', gap: 8, color: '#e2e8f0', fontSize: 14, cursor: 'pointer' },
-  select: { background: '#1e293b', border: '1px solid #334155', borderRadius: 6, color: '#e2e8f0', fontSize: 14, padding: '8px 10px', width: '100%', outline: 'none' },
+  radioLabel: { display: 'flex', alignItems: 'center', gap: 8, color: 'var(--nexus-text)', fontSize: 14, cursor: 'pointer' },
+  select: { background: 'var(--nexus-bg2)', border: '1px solid var(--nexus-border)', borderRadius: 6, color: 'var(--nexus-text)', fontSize: 14, padding: '8px 10px', width: '100%', outline: 'none' },
 
   // 移动端表单样式
   formRow: { display: 'flex', flexDirection: 'column' as const, gap: 4 },
-  input: { background: '#1e293b', border: '1px solid #334155', borderRadius: 6, color: '#e2e8f0', fontSize: 14, padding: '8px 10px', outline: 'none', width: '100%', boxSizing: 'border-box' as const },
+  input: { background: 'var(--nexus-bg2)', border: '1px solid var(--nexus-border)', borderRadius: 6, color: 'var(--nexus-text)', fontSize: 14, padding: '8px 10px', outline: 'none', width: '100%', boxSizing: 'border-box' as const },
 
   // PC 端表单样式
   desktopFormRow: { display: 'flex', flexDirection: 'row' as const, alignItems: 'center', gap: 16 },
-  desktopInput: { background: '#1e293b', border: '1px solid #334155', borderRadius: 6, color: '#e2e8f0', fontSize: 14, padding: '10px 12px', outline: 'none', flex: 1, boxSizing: 'border-box' as const },
+  desktopInput: { background: 'var(--nexus-bg2)', border: '1px solid var(--nexus-border)', borderRadius: 6, color: 'var(--nexus-text)', fontSize: 14, padding: '10px 12px', outline: 'none', flex: 1, boxSizing: 'border-box' as const },
 
   // 工作区列表
   workspaceList: { display: 'flex', flexDirection: 'column' as const, gap: 4 },
   workspaceItem: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 6, cursor: 'pointer', background: 'transparent', transition: 'background 0.15s' },
-  workspaceItemSelected: { background: '#1e293b', border: '1px solid #3b82f6' },
+  workspaceItemSelected: { background: 'var(--nexus-bg2)', border: '1px solid var(--nexus-accent)' },
   workspaceIcon: { fontSize: 16 },
-  workspaceName: { fontSize: 14, color: '#e2e8f0' },
+  workspaceName: { fontSize: 14, color: 'var(--nexus-text)' },
 
   // 底部按钮
-  footer: { display: 'flex', gap: 12, padding: '12px 16px', borderTop: '1px solid #334155', flexShrink: 0, justifyContent: 'flex-end' },
-  cancelBtn: { background: 'transparent', border: '1px solid #334155', borderRadius: 6, color: '#94a3b8', cursor: 'pointer', fontSize: 14, padding: '8px 16px' },
-  confirmBtn: { background: '#3b82f6', border: 'none', borderRadius: 6, color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600, padding: '8px 16px' },
+  footer: { display: 'flex', gap: 12, padding: '12px 16px', borderTop: '1px solid var(--nexus-border)', flexShrink: 0, justifyContent: 'flex-end' },
+  cancelBtn: { background: 'transparent', border: '1px solid var(--nexus-border)', borderRadius: 6, color: 'var(--nexus-text2)', cursor: 'pointer', fontSize: 14, padding: '8px 16px' },
+  confirmBtn: { background: 'var(--nexus-accent)', border: 'none', borderRadius: 6, color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600, padding: '8px 16px' },
 }

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { Icon } from './icons'
 import { getWindowStatus, STATUS_DOT_COLOR, STATUS_DOT_TITLE } from './windowStatus'
 
 interface TmuxWindow {
@@ -184,16 +185,16 @@ export default function TabBar({ windows, activeIndex, onSwitch, onClose, onAdd,
             >{activeSession}</button>
           )}
           <button style={s.iconBtn} onPointerDown={(e) => { e.preventDefault(); onAdd() }} title="新建会话">+</button>
-          {onUpload && <button style={s.iconBtn} onPointerDown={(e) => { e.preventDefault(); onUpload() }} title="上传文件">📎</button>}
+          {onUpload && <button style={s.iconBtn} onPointerDown={(e) => { e.preventDefault(); onUpload() }} title="上传文件"><Icon name="paperclip" size={18} /></button>}
           {onOpenTasks && (
             <button style={{ ...s.iconBtn, position: 'relative' }} onPointerDown={(e) => { e.preventDefault(); onOpenTasks() }} title="任务面板">
-              📋
+              <Icon name="clipboard" size={18} />
               {!!runningTaskCount && (
-                <span style={{ position: 'absolute', top: 2, right: 2, background: '#22c55e', borderRadius: '50%', width: 8, height: 8, display: 'block' }} />
+                <span style={{ position: 'absolute', top: 2, right: 2, background: 'var(--nexus-success)', borderRadius: '50%', width: 8, height: 8, display: 'block' }} />
               )}
             </button>
           )}
-          <button style={s.iconBtn} onPointerDown={(e) => { e.preventDefault(); onOpenSettings() }} title="设置">⚙</button>
+          <button style={s.iconBtn} onPointerDown={(e) => { e.preventDefault(); onOpenSettings() }} title="设置"><Icon name="settings" size={18} /></button>
         </div>
       </div>
 
@@ -229,7 +230,7 @@ export default function TabBar({ windows, activeIndex, onSwitch, onClose, onAdd,
                   onSwitchSession?.(sess)
                   setShowSessionPicker(false)
                 }}
-              >{sess === activeSession ? '✓ ' : '  '}{sess}</div>
+              ><span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>{sess === activeSession ? <Icon name="check" size={14} /> : <span style={{ width: 14 }} />}{sess}</span></div>
             ))}
           </div>
         </>
@@ -287,13 +288,13 @@ export default function TabBar({ windows, activeIndex, onSwitch, onClose, onAdd,
               style={s.menuItem}
               onPointerDown={() => menuIndex !== null && startRename(menuIndex, windows.find(w => w.index === menuIndex)?.name || '')}
             >
-              <span style={s.menuIcon}>✎</span> 重命名
+              <Icon name="pencil" size={14} /> 重命名
             </button>
             <button
               style={s.menuItemClose}
               onPointerDown={() => menuIndex !== null && handleClose(menuIndex)}
             >
-              <span style={s.menuIcon}>✕</span> 关闭会话
+              <Icon name="x" size={14} /> 关闭会话
             </button>
           </div>
         </>

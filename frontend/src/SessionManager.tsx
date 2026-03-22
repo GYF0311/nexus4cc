@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import GhostShield from './GhostShield'
+import { Icon } from './icons'
 
 // 检测是否为 PC 端（>= 768px）
 function useIsDesktop() {
@@ -108,7 +109,7 @@ export default function SessionManager({ token, onClose }: Props) {
         <div style={isDesktop ? s.desktopPanel : s.panel}>
           <div style={s.header}>
             <span style={s.title}>{editingConfig.isNew ? '新建配置' : '编辑配置'}</span>
-            <button style={s.closeBtn} onPointerDown={() => { setEditingConfig(null); setCfgError(null) }}>×</button>
+            <button style={{...s.closeBtn, display: 'flex', alignItems: 'center', justifyContent: 'center'}} onPointerDown={() => { setEditingConfig(null); setCfgError(null) }}><Icon name="x" size={20} /></button>
           </div>
           <div style={s.scrollArea}>
             <div style={s.section}>
@@ -159,7 +160,7 @@ export default function SessionManager({ token, onClose }: Props) {
         {/* 顶部：标题 + 关闭 */}
         <div style={s.header}>
           <span style={s.title}>API 配置管理</span>
-          <button style={s.closeBtn} onPointerDown={onClose}>×</button>
+          <button style={{...s.closeBtn, display: 'flex', alignItems: 'center', justifyContent: 'center'}} onPointerDown={onClose}><Icon name="x" size={20} /></button>
         </div>
 
         {/* 配置列表 */}
@@ -210,45 +211,45 @@ export default function SessionManager({ token, onClose }: Props) {
 const s: Record<string, React.CSSProperties> = {
   // 移动端样式（默认）
   overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', zIndex: 100 },
-  panel: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: '#0f172a', display: 'flex', flexDirection: 'column', color: '#e2e8f0' },
+  panel: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'var(--nexus-bg)', display: 'flex', flexDirection: 'column', color: 'var(--nexus-text)' },
 
   // PC 端样式
   desktopOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' },
-  desktopPanel: { background: '#0f172a', borderRadius: 12, display: 'flex', flexDirection: 'column', color: '#e2e8f0', width: '100%', maxWidth: 800, maxHeight: '85vh', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', overflow: 'hidden' },
+  desktopPanel: { background: 'var(--nexus-bg)', border: '1px solid var(--nexus-border)', borderRadius: 12, display: 'flex', flexDirection: 'column', color: 'var(--nexus-text)', width: '100%', maxWidth: 800, maxHeight: '85vh', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', overflow: 'hidden' },
 
-  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid #334155', flexShrink: 0 },
+  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--nexus-border)', flexShrink: 0 },
   title: { fontSize: 16, fontWeight: 600 },
-  closeBtn: { background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 24, lineHeight: 1, padding: '0 4px' },
+  closeBtn: { background: 'transparent', border: 'none', color: 'var(--nexus-text2)', cursor: 'pointer', fontSize: 24, lineHeight: 1, padding: '0 4px' },
   scrollArea: { flex: 1, overflowY: 'auto', padding: '8px 0' },
-  section: { padding: '12px 16px', borderBottom: '1px solid #1e293b' },
+  section: { padding: '12px 16px', borderBottom: '1px solid var(--nexus-border)' },
   sectionHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  sectionTitle: { fontSize: 11, color: '#64748b', letterSpacing: 0.5, textTransform: 'uppercase' as const, marginBottom: 8 },
-  refreshBtn: { background: 'transparent', border: '1px solid #334155', borderRadius: 4, color: '#94a3b8', cursor: 'pointer', fontSize: 11, padding: '2px 8px' },
-  errorMsg: { color: '#f87171', fontSize: 12, marginBottom: 8 },
-  emptyMsg: { color: '#475569', fontSize: 13, padding: '8px 0' },
+  sectionTitle: { fontSize: 11, color: 'var(--nexus-text2)', letterSpacing: 0.5, textTransform: 'uppercase' as const, marginBottom: 8 },
+  refreshBtn: { background: 'transparent', border: '1px solid var(--nexus-border)', borderRadius: 4, color: 'var(--nexus-text2)', cursor: 'pointer', fontSize: 11, padding: '2px 8px' },
+  errorMsg: { color: 'var(--nexus-error)', fontSize: 12, marginBottom: 8 },
+  emptyMsg: { color: 'var(--nexus-muted)', fontSize: 13, padding: '8px 0' },
 
   // 移动端表单样式
   formRow: { display: 'flex', flexDirection: 'column' as const, gap: 4, marginBottom: 10 },
-  label: { color: '#94a3b8', fontSize: 12 },
-  input: { background: '#1e293b', border: '1px solid #334155', borderRadius: 6, color: '#e2e8f0', fontSize: 14, padding: '8px 10px', outline: 'none', width: '100%', boxSizing: 'border-box' as const },
+  label: { color: 'var(--nexus-text2)', fontSize: 12 },
+  input: { background: 'var(--nexus-bg2)', border: '1px solid var(--nexus-border)', borderRadius: 6, color: 'var(--nexus-text)', fontSize: 14, padding: '8px 10px', outline: 'none', width: '100%', boxSizing: 'border-box' as const },
   inputDisabled: { opacity: 0.5 },
 
   // PC 端表单样式（左右布局）
   desktopFormRow: { display: 'flex', flexDirection: 'row' as const, alignItems: 'center', gap: 16, marginBottom: 12 },
-  desktopLabel: { color: '#94a3b8', fontSize: 13, width: 140, flexShrink: 0, textAlign: 'right' as const },
-  desktopInput: { background: '#1e293b', border: '1px solid #334155', borderRadius: 6, color: '#e2e8f0', fontSize: 14, padding: '10px 12px', outline: 'none', flex: 1, boxSizing: 'border-box' as const },
+  desktopLabel: { color: 'var(--nexus-text2)', fontSize: 13, width: 140, flexShrink: 0, textAlign: 'right' as const },
+  desktopInput: { background: 'var(--nexus-bg2)', border: '1px solid var(--nexus-border)', borderRadius: 6, color: 'var(--nexus-text)', fontSize: 14, padding: '10px 12px', outline: 'none', flex: 1, boxSizing: 'border-box' as const },
 
-  select: { background: '#1e293b', border: '1px solid #334155', borderRadius: 6, color: '#e2e8f0', fontSize: 14, padding: '8px 10px', outline: 'none', width: '100%', boxSizing: 'border-box' as const },
-  hint: { color: '#64748b', fontSize: 11, marginBottom: 10, lineHeight: 1.6 },
-  code: { background: '#1e293b', borderRadius: 3, padding: '1px 4px', fontFamily: 'monospace', fontSize: 10, color: '#93c5fd' },
-  createBtn: { background: '#3b82f6', border: 'none', borderRadius: 6, color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600, padding: '10px 20px', width: '100%' },
+  select: { background: 'var(--nexus-bg2)', border: '1px solid var(--nexus-border)', borderRadius: 6, color: 'var(--nexus-text)', fontSize: 14, padding: '8px 10px', outline: 'none', width: '100%', boxSizing: 'border-box' as const },
+  hint: { color: 'var(--nexus-muted)', fontSize: 11, marginBottom: 10, lineHeight: 1.6 },
+  code: { background: 'var(--nexus-bg2)', borderRadius: 3, padding: '1px 4px', fontFamily: 'monospace', fontSize: 10, color: 'var(--nexus-accent)' },
+  createBtn: { background: 'var(--nexus-accent)', border: 'none', borderRadius: 6, color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600, padding: '10px 20px', width: '100%' },
   createBtnDisabled: { opacity: 0.5, cursor: 'not-allowed' },
-  logoutBtn: { background: 'transparent', border: '1px solid #334155', borderRadius: 6, color: '#94a3b8', cursor: 'pointer', fontSize: 14, padding: '10px 20px', width: '100%' },
-  configRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid #1e293b' },
+  logoutBtn: { background: 'transparent', border: '1px solid var(--nexus-border)', borderRadius: 6, color: 'var(--nexus-text2)', cursor: 'pointer', fontSize: 14, padding: '10px 20px', width: '100%' },
+  configRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--nexus-border)' },
   configInfo: { flex: 1 },
-  configLabel: { color: '#e2e8f0', fontSize: 14 },
-  configMeta: { color: '#64748b', fontSize: 11, marginTop: 2, fontFamily: 'monospace' },
+  configLabel: { color: 'var(--nexus-text)', fontSize: 14 },
+  configMeta: { color: 'var(--nexus-muted)', fontSize: 11, marginTop: 2, fontFamily: 'monospace' },
   configActions: { display: 'flex', gap: 6, flexShrink: 0 },
-  editBtn: { background: 'transparent', border: '1px solid #334155', borderRadius: 4, color: '#93c5fd', cursor: 'pointer', fontSize: 11, padding: '3px 8px' },
-  deleteBtn: { background: 'transparent', border: '1px solid #334155', borderRadius: 4, color: '#f87171', cursor: 'pointer', fontSize: 11, padding: '3px 8px' },
+  editBtn: { background: 'transparent', border: '1px solid var(--nexus-border)', borderRadius: 4, color: 'var(--nexus-accent)', cursor: 'pointer', fontSize: 11, padding: '3px 8px' },
+  deleteBtn: { background: 'transparent', border: '1px solid var(--nexus-border)', borderRadius: 4, color: 'var(--nexus-error)', cursor: 'pointer', fontSize: 11, padding: '3px 8px' },
 }

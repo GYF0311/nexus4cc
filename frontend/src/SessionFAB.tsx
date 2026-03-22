@@ -1,44 +1,56 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 
 const FAB_POS_KEY = 'nexus_fab_pos'
-const DRAG_THRESHOLD = 20
+const DRAG_THRESHOLD = 8
+const SNAP_MARGIN = 12
 
 interface Pos { x: number; y: number }
 
 interface Props {
   onClick: () => void
   windowCount?: number
+  topInset?: number
+  bottomInset?: number
 }
 
-function clampPos(x: number, y: number, size: number): Pos {
-  const maxX = window.innerWidth - size
-  const maxY = window.innerHeight - size
+function snapToEdge(x: number, size: number): number {
+  return (x + size / 2) < window.innerWidth / 2 ? SNAP_MARGIN : window.innerWidth - size - SNAP_MARGIN
+}
+
+function clampPos(x: number, y: number, size: number, topInset: number, bottomInset: number): Pos {
   return {
-    x: Math.max(0, Math.min(x, maxX)),
-    y: Math.max(0, Math.min(y, maxY)),
+    x: Math.max(0, Math.min(x, window.innerWidth - size)),
+    y: Math.max(topInset + 8, Math.min(y, window.innerHeight - size - bottomInset - 8)),
   }
 }
 
-function defaultPos(size: number): Pos {
+function defaultPos(size: number, bottomInset: number): Pos {
   return {
-    x: window.innerWidth - size - 16,
-    y: window.innerHeight - size - 80,
+    x: window.innerWidth - size - SNAP_MARGIN,
+    y: window.innerHeight - size - bottomInset - 24,
   }
 }
 
-export default function SessionFAB({ onClick, windowCount }: Props) {
+export default function SessionFAB({ onClick, windowCount, topInset = 0, bottomInset = 0 }: Props) {
   const SIZE = 52
 
+  // Logical position — persisted, keyboard-unaware
   const [pos, setPos] = useState<Pos>(() => {
     try {
       const s = localStorage.getItem(FAB_POS_KEY)
       if (s) {
         const p = JSON.parse(s) as Pos
-        return clampPos(p.x, p.y, SIZE)
+        return clampPos(p.x, p.y, SIZE, topInset, bottomInset)
       }
     } catch {}
-    return defaultPos(SIZE)
+    return defaultPos(SIZE, bottomInset)
   })
+
+  // Keyboard height detected via visualViewport
+  const [keyboardHeight, setKeyboardHeight] = useState(0)
+
+  // Transition string — set contextually, cleared after animation
+  const [transition, setTransition] = useState('')
 
   const isDragging = useRef(false)
   const startPointer = useRef<Pos>({ x: 0, y: 0 })
@@ -47,21 +59,63 @@ export default function SessionFAB({ onClick, windowCount }: Props) {
   const posRef = useRef(pos)
   posRef.current = pos
 
-  // Persist on pos change (only after mount)
+  // Persist logical position (skip on first mount)
   const mounted = useRef(false)
   useEffect(() => {
     if (!mounted.current) { mounted.current = true; return }
     localStorage.setItem(FAB_POS_KEY, JSON.stringify(pos))
   }, [pos])
 
-  // Re-clamp on viewport resize
+  // Track keyboard via visualViewport resize
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    function update() {
+      const kbH = Math.max(0, window.innerHeight - vv!.height - vv!.offsetTop)
+      setKeyboardHeight(kbH)
+    }
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    update()
+    return () => {
+      vv.removeEventListener('resize', update)
+      vv.removeEventListener('scroll', update)
+    }
+  }, [])
+
+  // Animate when keyboard height changes
+  const prevKeyboardHeight = useRef(keyboardHeight)
+  useEffect(() => {
+    if (prevKeyboardHeight.current === keyboardHeight) return
+    prevKeyboardHeight.current = keyboardHeight
+    setTransition('top 0.22s ease, left 0.22s ease')
+    const t = setTimeout(() => setTransition(''), 260)
+    return () => clearTimeout(t)
+  }, [keyboardHeight])
+
+  // Re-clamp + re-snap when toolbar insets change
+  useEffect(() => {
+    setPos(p => {
+      const clamped = clampPos(p.x, p.y, SIZE, topInset, bottomInset)
+      return { x: snapToEdge(clamped.x, SIZE), y: clamped.y }
+    })
+  }, [topInset, bottomInset])
+
+  // Re-clamp on window resize
   useEffect(() => {
     function onResize() {
-      setPos(p => clampPos(p.x, p.y, SIZE))
+      setPos(p => {
+        const clamped = clampPos(p.x, p.y, SIZE, topInset, bottomInset)
+        return { x: snapToEdge(clamped.x, SIZE), y: clamped.y }
+      })
     }
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
-  }, [])
+  }, [topInset, bottomInset])
+
+  // Rendered position = logical pos clamped to effective insets (incl. keyboard)
+  const effectiveBottomInset = bottomInset + keyboardHeight
+  const renderedPos = clampPos(pos.x, pos.y, SIZE, topInset, effectiveBottomInset)
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     e.preventDefault()
@@ -69,6 +123,7 @@ export default function SessionFAB({ onClick, windowCount }: Props) {
     moved.current = false
     startPointer.current = { x: e.clientX, y: e.clientY }
     startPos.current = posRef.current
+    setTransition('')
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
   }, [])
 
@@ -76,29 +131,28 @@ export default function SessionFAB({ onClick, windowCount }: Props) {
     if (!isDragging.current) return
     const dx = e.clientX - startPointer.current.x
     const dy = e.clientY - startPointer.current.y
-    if (!moved.current && Math.hypot(dx, dy) >= DRAG_THRESHOLD) {
-      moved.current = true
-    }
+    if (!moved.current && Math.hypot(dx, dy) >= DRAG_THRESHOLD) moved.current = true
     if (moved.current) {
-      setPos(clampPos(startPos.current.x + dx, startPos.current.y + dy, SIZE))
+      setPos(clampPos(startPos.current.x + dx, startPos.current.y + dy, SIZE, topInset, effectiveBottomInset))
     }
-  }, [])
+  }, [topInset, effectiveBottomInset])
 
   const onPointerUp = useCallback((e: React.PointerEvent) => {
     if (!isDragging.current) return
-    e.preventDefault() // Prevent compatibility mouse/click events after touch
+    e.preventDefault()
     isDragging.current = false
     if (!moved.current) {
       onClick()
     } else {
-      // Persist final clamped position
       const dx = e.clientX - startPointer.current.x
       const dy = e.clientY - startPointer.current.y
-      const final = clampPos(startPos.current.x + dx, startPos.current.y + dy, SIZE)
-      setPos(final)
-      localStorage.setItem(FAB_POS_KEY, JSON.stringify(final))
+      const raw = clampPos(startPos.current.x + dx, startPos.current.y + dy, SIZE, topInset, effectiveBottomInset)
+      const snapped: Pos = { x: snapToEdge(raw.x, SIZE), y: raw.y }
+      setTransition('left 0.28s cubic-bezier(0.34,1.56,0.64,1)')
+      setPos(snapped)
+      localStorage.setItem(FAB_POS_KEY, JSON.stringify(snapped))
     }
-  }, [onClick])
+  }, [onClick, topInset, effectiveBottomInset])
 
   return (
     <div
@@ -107,12 +161,12 @@ export default function SessionFAB({ onClick, windowCount }: Props) {
       onPointerUp={onPointerUp}
       style={{
         position: 'fixed',
-        left: pos.x,
-        top: pos.y,
+        left: renderedPos.x,
+        top: renderedPos.y,
         width: SIZE,
         height: SIZE,
         borderRadius: '50%',
-        background: '#3b82f6',
+        background: 'var(--nexus-accent)',
         boxShadow: '0 4px 16px rgba(0,0,0,0.35)',
         display: 'flex',
         alignItems: 'center',
@@ -121,6 +175,7 @@ export default function SessionFAB({ onClick, windowCount }: Props) {
         zIndex: 350,
         userSelect: 'none',
         touchAction: 'none',
+        transition,
       }}
     >
       <svg viewBox="0 0 24 24" fill="white" width="26" height="26">
@@ -131,7 +186,7 @@ export default function SessionFAB({ onClick, windowCount }: Props) {
           position: 'absolute',
           top: -4,
           right: -4,
-          background: '#22c55e',
+          background: 'var(--nexus-success)',
           color: '#fff',
           borderRadius: '50%',
           width: 18,
