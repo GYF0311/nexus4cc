@@ -7,7 +7,7 @@ import bcrypt from 'bcrypt';
 import { createServer } from 'node:http';
 import { exec, spawn, execSync } from 'child_process';
 import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { dirname, join, normalize, isAbsolute } from 'path';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, unlinkSync } from 'fs';
 import https from 'node:https';
 import multer from 'multer';
@@ -220,6 +220,25 @@ app.get('/api/workspaces', authMiddleware, (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// GET /api/browse?path=<path> — 浏览目录内容
+app.get('/api/browse', authMiddleware, (req, res) => {
+  try {
+    let p = req.query.path || WORKSPACE_ROOT
+    if (p === '~') p = WORKSPACE_ROOT
+    if (!isAbsolute(p)) p = join(WORKSPACE_ROOT, p)
+    p = normalize(p)
+    const entries = readdirSync(p, { withFileTypes: true })
+    const dirs = entries
+      .filter(e => e.isDirectory() && !e.name.startsWith('.'))
+      .map(e => ({ name: e.name, path: join(p, e.name) }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+    const parent = dirname(p) !== p ? dirname(p) : null
+    res.json({ path: p, parent, dirs })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
 
 // POST /api/upload — 上传文件到指定 session 的 cwd（F-14）
 // body: multipart/form-data, fields: file, session_name (optional)

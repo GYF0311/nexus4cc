@@ -7,6 +7,12 @@ interface Workspace {
   path: string
 }
 
+interface BrowseResult {
+  path: string
+  parent: string | null
+  dirs: { name: string; path: string }[]
+}
+
 interface Config {
   id: string
   label: string
@@ -40,6 +46,13 @@ export default function WorkspaceSelector({ token, onClose, onConfirm }: Props) 
   const [configs, setConfigs] = useState<Config[]>([])
   const [selectedProfile, setSelectedProfile] = useState<string>(() => localStorage.getItem('nexus_last_profile') || '')
 
+  // 文件浏览器状态
+  const [browsePath, setBrowsePath] = useState<string | null>(null)
+  const [browseDirs, setBrowseDirs] = useState<{ name: string; path: string }[]>([])
+  const [browseParent, setBrowseParent] = useState<string | null>(null)
+  const [browseLoading, setBrowseLoading] = useState(false)
+  const [browseError, setBrowseError] = useState<string | null>(null)
+
   const headers = { Authorization: `Bearer ${token}` }
 
   async function fetchWorkspaces() {
@@ -58,9 +71,28 @@ export default function WorkspaceSelector({ token, onClose, onConfirm }: Props) 
     }
   }
 
+  async function browseDir(path: string | null) {
+    setBrowseLoading(true)
+    setBrowseError(null)
+    try {
+      const url = path ? `/api/browse?path=${encodeURIComponent(path)}` : '/api/browse'
+      const r = await fetch(url, { headers })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      const data: BrowseResult = await r.json()
+      setBrowsePath(data.path)
+      setBrowseDirs(data.dirs)
+      setBrowseParent(data.parent)
+    } catch (e: unknown) {
+      setBrowseError(e instanceof Error ? e.message : '浏览失败')
+    } finally {
+      setBrowseLoading(false)
+    }
+  }
+
   useEffect(() => {
     fetchWorkspaces()
     fetchConfigs()
+    browseDir(null)
   }, [])
 
   async function fetchConfigs() {
@@ -69,7 +101,6 @@ export default function WorkspaceSelector({ token, onClose, onConfirm }: Props) 
       if (r.ok) {
         const data = await r.json()
         setConfigs(data)
-        // 没有保存过的选择时，默认用第一个 profile
         if (!localStorage.getItem('nexus_last_profile') && data.length > 0) {
           setSelectedProfile(data[0].id)
         }
@@ -79,9 +110,9 @@ export default function WorkspaceSelector({ token, onClose, onConfirm }: Props) 
     }
   }
 
-  function handleSelect(workspace: Workspace) {
-    setSelectedPath(workspace.path)
-    setInputPath(workspace.path)
+  function handleSelect(path: string) {
+    setSelectedPath(path)
+    setInputPath(path)
   }
 
   function handleInputChange(value: string) {
@@ -107,6 +138,14 @@ export default function WorkspaceSelector({ token, onClose, onConfirm }: Props) 
     if (e.key === 'Enter') {
       handleConfirm()
     }
+  }
+
+  // 截断路径显示：只显示最后几个片段
+  function formatBrowsePath(p: string | null): string {
+    if (!p) return '~'
+    const parts = p.split('/').filter(Boolean)
+    if (parts.length <= 3) return '/' + parts.join('/')
+    return '.../' + parts.slice(-2).join('/')
   }
 
   return (
@@ -192,33 +231,106 @@ export default function WorkspaceSelector({ token, onClose, onConfirm }: Props) 
             </div>
           )}
 
-          {/* 常用目录列表 */}
+          {/* 目录浏览器 */}
           <div style={s.section}>
             <div style={s.sectionHeader}>
-              <span style={s.sectionTitle}>工作区目录</span>
-              <button style={s.refreshBtn} onPointerDown={fetchWorkspaces}>刷新</button>
+              <div style={s.browsePathRow}>
+                <span style={s.sectionTitle}>浏览目录</span>
+                <span style={s.browseCurrent} title={browsePath || ''}>{formatBrowsePath(browsePath)}</span>
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {browsePath && (
+                  <button
+                    style={s.refreshBtn}
+                    onPointerDown={() => handleSelect(browsePath)}
+                    title="选择当前目录"
+                  >选此目录</button>
+                )}
+                <button style={s.refreshBtn} onPointerDown={() => browseDir(null)}>根目录</button>
+              </div>
             </div>
-            {error && <div style={s.errorMsg}>{error}</div>}
-            {loading && <div style={s.emptyMsg}>加载中...</div>}
-            {!loading && workspaces.length === 0 && !error && (
-              <div style={s.emptyMsg}>暂无工作区目录</div>
+            {browseError && <div style={s.errorMsg}>{browseError}</div>}
+            {browseLoading && <div style={s.emptyMsg}>加载中...</div>}
+            {!browseLoading && (
+              <div style={s.workspaceList}>
+                {/* 向上一级 */}
+                {browseParent && (
+                  <div
+                    style={s.browseUpItem}
+                    onPointerDown={() => browseDir(browseParent)}
+                  >
+                    <span style={s.workspaceIcon}>↑</span>
+                    <span style={{ ...s.workspaceName, color: 'var(--nexus-text2)' }}>..</span>
+                    <span style={s.browseHint}>{browseParent.split('/').slice(-1)[0] || '/'}</span>
+                  </div>
+                )}
+                {/* 子目录列表 */}
+                {browseDirs.length === 0 && !browseLoading && (
+                  <div style={s.emptyMsg}>无子目录</div>
+                )}
+                {browseDirs.map(dir => (
+                  <div
+                    key={dir.path}
+                    style={{
+                      ...s.browseItem,
+                      ...(selectedPath === dir.path ? s.workspaceItemSelected : {}),
+                    }}
+                    onPointerDown={() => handleSelect(dir.path)}
+                  >
+                    <span style={s.workspaceIcon}>📁</span>
+                    <span style={s.workspaceName}>{dir.name}</span>
+                    <button
+                      style={s.browseEnterBtn}
+                      onPointerDown={(e) => {
+                        e.stopPropagation()
+                        browseDir(dir.path)
+                      }}
+                      title="进入该目录"
+                    >
+                      <Icon name="arrowRight" size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
             )}
-            <div style={s.workspaceList}>
-              {workspaces.map(ws => (
-                <div
-                  key={ws.path}
-                  style={{
-                    ...s.workspaceItem,
-                    ...(selectedPath === ws.path ? s.workspaceItemSelected : {}),
-                  }}
-                  onPointerDown={() => handleSelect(ws)}
-                >
-                  <span style={s.workspaceIcon}>📁</span>
-                  <span style={s.workspaceName}>{ws.name}</span>
-                </div>
-              ))}
-            </div>
           </div>
+
+          {/* 常用工作区快捷方式 */}
+          {workspaces.length > 0 && (
+            <div style={s.section}>
+              <div style={s.sectionHeader}>
+                <span style={s.sectionTitle}>快捷工作区</span>
+                <button style={s.refreshBtn} onPointerDown={fetchWorkspaces}>刷新</button>
+              </div>
+              {error && <div style={s.errorMsg}>{error}</div>}
+              {loading && <div style={s.emptyMsg}>加载中...</div>}
+              <div style={s.workspaceList}>
+                {workspaces.map(ws => (
+                  <div
+                    key={ws.path}
+                    style={{
+                      ...s.workspaceItem,
+                      ...(selectedPath === ws.path ? s.workspaceItemSelected : {}),
+                    }}
+                    onPointerDown={() => handleSelect(ws.path)}
+                  >
+                    <span style={s.workspaceIcon}>📁</span>
+                    <span style={s.workspaceName}>{ws.name}</span>
+                    <button
+                      style={s.browseEnterBtn}
+                      onPointerDown={(e) => {
+                        e.stopPropagation()
+                        browseDir(ws.path)
+                      }}
+                      title="浏览该目录"
+                    >
+                      <Icon name="arrowRight" size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 底部按钮 */}
@@ -246,9 +358,9 @@ const s: Record<string, React.CSSProperties> = {
   scrollArea: { flex: 1, overflowY: 'auto', padding: '8px 0' },
   section: { padding: '12px 16px', borderBottom: '1px solid var(--nexus-border)' },
   sectionHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  sectionTitle: { fontSize: 11, color: 'var(--nexus-text2)', letterSpacing: 0.5, textTransform: 'uppercase' as const, marginBottom: 8 },
+  sectionTitle: { fontSize: 11, color: 'var(--nexus-text2)', letterSpacing: 0.5, textTransform: 'uppercase' as const, marginBottom: 0 },
   selectedPath: { fontSize: 14, color: 'var(--nexus-accent)', fontFamily: 'monospace', padding: '8px 12px', background: 'var(--nexus-bg2)', borderRadius: 6, wordBreak: 'break-all' as const },
-  refreshBtn: { background: 'transparent', border: '1px solid var(--nexus-border)', borderRadius: 4, color: 'var(--nexus-text2)', cursor: 'pointer', fontSize: 11, padding: '2px 8px' },
+  refreshBtn: { background: 'transparent', border: '1px solid var(--nexus-border)', borderRadius: 4, color: 'var(--nexus-text2)', cursor: 'pointer', fontSize: 11, padding: '2px 8px', flexShrink: 0 },
   errorMsg: { color: 'var(--nexus-error)', fontSize: 12, marginBottom: 8 },
   emptyMsg: { color: 'var(--nexus-muted)', fontSize: 13, padding: '8px 0' },
   hint: { color: 'var(--nexus-muted)', fontSize: 11, marginTop: 6 },
@@ -264,12 +376,22 @@ const s: Record<string, React.CSSProperties> = {
   desktopFormRow: { display: 'flex', flexDirection: 'row' as const, alignItems: 'center', gap: 16 },
   desktopInput: { background: 'var(--nexus-bg2)', border: '1px solid var(--nexus-border)', borderRadius: 6, color: 'var(--nexus-text)', fontSize: 14, padding: '10px 12px', outline: 'none', flex: 1, boxSizing: 'border-box' as const },
 
+  // 浏览器路径行
+  browsePathRow: { display: 'flex', alignItems: 'center', gap: 8 },
+  browseCurrent: { fontSize: 11, color: 'var(--nexus-accent)', fontFamily: 'monospace', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const },
+
   // 工作区列表
-  workspaceList: { display: 'flex', flexDirection: 'column' as const, gap: 4 },
-  workspaceItem: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 6, cursor: 'pointer', background: 'transparent', transition: 'background 0.15s' },
+  workspaceList: { display: 'flex', flexDirection: 'column' as const, gap: 2 },
+  workspaceItem: { display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 6, cursor: 'pointer', background: 'transparent' },
   workspaceItemSelected: { background: 'var(--nexus-bg2)', border: '1px solid var(--nexus-accent)' },
-  workspaceIcon: { fontSize: 16 },
-  workspaceName: { fontSize: 14, color: 'var(--nexus-text)' },
+  workspaceIcon: { fontSize: 14, flexShrink: 0 },
+  workspaceName: { fontSize: 14, color: 'var(--nexus-text)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const },
+
+  // 浏览器条目
+  browseItem: { display: 'flex', alignItems: 'center', gap: 10, padding: '7px 12px', borderRadius: 6, cursor: 'pointer', background: 'transparent' },
+  browseUpItem: { display: 'flex', alignItems: 'center', gap: 10, padding: '7px 12px', borderRadius: 6, cursor: 'pointer', background: 'transparent', borderBottom: '1px solid var(--nexus-border)', marginBottom: 4 },
+  browseHint: { fontSize: 11, color: 'var(--nexus-muted)', fontFamily: 'monospace' },
+  browseEnterBtn: { background: 'transparent', border: 'none', color: 'var(--nexus-text2)', cursor: 'pointer', padding: '2px 4px', display: 'flex', alignItems: 'center', flexShrink: 0, opacity: 0.6 },
 
   // 底部按钮
   footer: { display: 'flex', gap: 12, padding: '12px 16px', borderTop: '1px solid var(--nexus-border)', flexShrink: 0, justifyContent: 'flex-end' },
