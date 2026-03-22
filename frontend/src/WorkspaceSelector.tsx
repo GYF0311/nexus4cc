@@ -251,19 +251,11 @@ export default function WorkspaceSelector({ token, onClose, onConfirm }: Props) 
                       ...(selectedPath === dir.path ? s.workspaceItemSelected : {}),
                     }}
                     onPointerDown={() => handleSelect(dir.path)}
+                    onDoubleClick={() => browseDir(dir.path)}
+                    title="单击选中，双击进入"
                   >
                     <span style={s.workspaceIcon}>📁</span>
                     <span style={s.workspaceName}>{dir.name}</span>
-                    <button
-                      style={s.browseEnterBtn}
-                      onPointerDown={(e) => {
-                        e.stopPropagation()
-                        browseDir(dir.path)
-                      }}
-                      title="进入该目录"
-                    >
-                      <Icon name="arrowRight" size={14} />
-                    </button>
                   </div>
                 ))}
               </div>
@@ -329,7 +321,6 @@ const s: Record<string, React.CSSProperties> = {
   browseItem: { display: 'flex', alignItems: 'center', gap: 10, padding: '7px 12px', borderRadius: 6, cursor: 'pointer', background: 'transparent' },
   browseUpItem: { display: 'flex', alignItems: 'center', gap: 10, padding: '7px 12px', borderRadius: 6, cursor: 'pointer', background: 'transparent', borderBottom: '1px solid var(--nexus-border)', marginBottom: 4 },
   browseHint: { fontSize: 11, color: 'var(--nexus-muted)', fontFamily: 'monospace' },
-  browseEnterBtn: { background: 'transparent', border: 'none', color: 'var(--nexus-text2)', cursor: 'pointer', padding: '2px 4px', display: 'flex', alignItems: 'center', flexShrink: 0, opacity: 0.6 },
 
   // 底部按钮
   footer: { display: 'flex', gap: 12, padding: '12px 16px', borderTop: '1px solid var(--nexus-border)', flexShrink: 0, justifyContent: 'flex-end' },
