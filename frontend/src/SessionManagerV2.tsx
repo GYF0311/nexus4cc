@@ -76,21 +76,19 @@ export default function SessionManagerV2({
   const clickTimerRef = useRef<number | null>(null)
   const pendingChannelRef = useRef<Channel | null>(null)
 
+  // 长按检测 refs（仅用于 channel）
+  const longPressTimerRef = useRef<number | null>(null)
+  const longPressChannelRef = useRef<Channel | null>(null)
+  const isLongPressRef = useRef(false)
+
   // 长按菜单状态
   const [longPressMenu, setLongPressMenu] = useState<{ channel: Channel; x: number; y: number } | null>(null)
 
-  // Project 长按菜单状态
-  const [projectLongPressMenu, setProjectLongPressMenu] = useState<{ project: Project; x: number; y: number } | null>(null)
-
   // 按下状态（用于视觉反馈）
   const [pressedChannel, setPressedChannel] = useState<number | null>(null)
-  const [pressedProject, setPressedProject] = useState<string | null>(null)
 
-  // 长按检测 refs
-  const longPressTimerRef = useRef<number | null>(null)
-  const longPressChannelRef = useRef<Channel | null>(null)
-  const longPressProjectRef = useRef<Project | null>(null)
-  const isLongPressRef = useRef(false)
+  // Project 菜单状态（类似 channel 的三点菜单）
+  const [projectMenu, setProjectMenu] = useState<{ project: Project; x: number; y: number } | null>(null)
 
   // 加载 Projects 列表
   const fetchProjects = useCallback(async () => {
@@ -168,12 +166,28 @@ export default function SessionManagerV2({
     longPressTimerRef.current = window.setTimeout(() => {
       isLongPressRef.current = true
       setPressedChannel(null)
-      // 显示长按菜单
+      // 显示长按菜单，带边界检测
       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+      const menuWidth = 120
+      const menuHeight = 80
+      let x = rect.left + rect.width / 2
+      let y = rect.bottom + 8
+      // 右边界检测
+      if (x + menuWidth / 2 > window.innerWidth - 16) {
+        x = window.innerWidth - menuWidth / 2 - 16
+      }
+      // 左边界检测
+      if (x - menuWidth / 2 < 16) {
+        x = menuWidth / 2 + 16
+      }
+      // 下边界检测
+      if (y + menuHeight > window.innerHeight - 16) {
+        y = rect.top - menuHeight - 8
+      }
       setLongPressMenu({
         channel,
-        x: rect.left + rect.width / 2,
-        y: rect.bottom + 8,
+        x,
+        y,
       })
     }, 500)
   }
@@ -289,9 +303,32 @@ export default function SessionManagerV2({
     }
   }
 
+  // 处理重命名 project
+  const handleRenameProject = async (project: Project) => {
+    setProjectMenu(null)
+    const newName = window.prompt('重命名 Project:', project.name)
+    if (!newName || newName === project.name) return
+
+    try {
+      const r = await fetch(`/api/projects/${encodeURIComponent(project.name)}/rename`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName }),
+      })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      fetchProjects()
+      // 如果重命名的是当前 project，需要通知父组件
+      if (project.name === currentProject) {
+        onSwitchProject(newName)
+      }
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : '重命名失败')
+    }
+  }
+
   // 处理关闭 project
   const handleCloseProject = async (project: Project) => {
-    setProjectLongPressMenu(null)
+    setProjectMenu(null)
 
     try {
       const r = await fetch(`/api/projects/${encodeURIComponent(project.name)}`, {
@@ -311,60 +348,6 @@ export default function SessionManagerV2({
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : '关闭失败')
-    }
-  }
-
-  // Project 长按开始
-  const handleProjectTouchStart = (project: Project, e: React.TouchEvent) => {
-    isLongPressRef.current = false
-    longPressProjectRef.current = project
-    setPressedProject(project.name)
-
-    // 启动长按检测（500ms）
-    longPressTimerRef.current = window.setTimeout(() => {
-      isLongPressRef.current = true
-      setPressedProject(null)
-      // 显示长按菜单
-      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-      setProjectLongPressMenu({
-        project,
-        x: rect.left + rect.width / 2,
-        y: rect.bottom + 8,
-      })
-    }, 500)
-  }
-
-  // Project 触摸结束
-  const handleProjectTouchEnd = (project: Project) => {
-    // 清除长按定时器
-    if (longPressTimerRef.current) {
-      window.clearTimeout(longPressTimerRef.current)
-      longPressTimerRef.current = null
-    }
-
-    // 如果是长按，不处理点击
-    if (isLongPressRef.current) {
-      setPressedProject(null)
-      return
-    }
-
-    // 延迟清除按下状态，让用户看到反馈
-    window.setTimeout(() => {
-      setPressedProject(null)
-    }, 100)
-
-    // 点击抬起时触发切换
-    if (project.name !== currentProject) {
-      handleProjectClick(project)
-    }
-  }
-
-  // Project 触摸移动时取消长按
-  const handleProjectTouchMove = () => {
-    setPressedProject(null)
-    if (longPressTimerRef.current) {
-      window.clearTimeout(longPressTimerRef.current)
-      longPressTimerRef.current = null
     }
   }
 
@@ -476,20 +459,52 @@ export default function SessionManagerV2({
                           e.stopPropagation()
                           e.preventDefault()
                           const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                          const menuWidth = 120
+                          const menuHeight = 80
+                          let x = rect.left + rect.width / 2
+                          let y = rect.bottom + 8
+                          // 右边界检测
+                          if (x + menuWidth / 2 > window.innerWidth - 16) {
+                            x = window.innerWidth - menuWidth / 2 - 16
+                          }
+                          // 左边界检测
+                          if (x - menuWidth / 2 < 16) {
+                            x = menuWidth / 2 + 16
+                          }
+                          // 下边界检测
+                          if (y + menuHeight > window.innerHeight - 16) {
+                            y = rect.top - menuHeight - 8
+                          }
                           setChannelMenu({
                             channel,
-                            x: rect.left + rect.width / 2,
-                            y: rect.bottom + 8,
+                            x,
+                            y,
                           })
                         }}
                         onPointerDown={(e) => {
                           // PC 端：阻止冒泡
                           e.stopPropagation()
                           const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                          const menuWidth = 120
+                          const menuHeight = 80
+                          let x = rect.left + rect.width / 2
+                          let y = rect.bottom + 8
+                          // 右边界检测
+                          if (x + menuWidth / 2 > window.innerWidth - 16) {
+                            x = window.innerWidth - menuWidth / 2 - 16
+                          }
+                          // 左边界检测
+                          if (x - menuWidth / 2 < 16) {
+                            x = menuWidth / 2 + 16
+                          }
+                          // 下边界检测
+                          if (y + menuHeight > window.innerHeight - 16) {
+                            y = rect.top - menuHeight - 8
+                          }
                           setChannelMenu({
                             channel,
-                            x: rect.left + rect.width / 2,
-                            y: rect.bottom + 8,
+                            x,
+                            y,
                           })
                         }}
                         title="更多选项"
@@ -575,18 +590,77 @@ export default function SessionManagerV2({
                       style={{
                         ...s.projectItem,
                         ...(isActive ? s.projectItemActive : {}),
-                        ...(pressedProject === project.name ? s.projectItemPressed : {}),
                       }}
-                      onTouchStart={(e) => handleProjectTouchStart(project, e)}
-                      onTouchEnd={(e) => {
-                        e.preventDefault()
-                        handleProjectTouchEnd(project)
+                      onPointerDown={() => {
+                        if (project.name !== currentProject) {
+                          handleProjectClick(project)
+                        }
                       }}
-                      onTouchMove={handleProjectTouchMove}
                     >
                       <span style={isActive ? s.projectDotActive : s.projectDot} />
                       <span style={s.projectName}>{project.name}</span>
                       <span style={s.channelCount}>({project.channelCount})</span>
+                      {/* 三个点菜单按钮 */}
+                      <button
+                        style={s.projectMenuBtn}
+                        onTouchStart={(e) => {
+                          e.stopPropagation()
+                        }}
+                        onTouchEnd={(e) => {
+                          e.stopPropagation()
+                          e.preventDefault()
+                          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                          const menuWidth = 140 // 菜单最小宽度估算
+                          const menuHeight = 100 // 菜单高度估算
+                          let x = rect.left + rect.width / 2
+                          let y = rect.bottom + 8
+                          // 右边界检测
+                          if (x + menuWidth / 2 > window.innerWidth - 16) {
+                            x = window.innerWidth - menuWidth / 2 - 16
+                          }
+                          // 左边界检测
+                          if (x - menuWidth / 2 < 16) {
+                            x = menuWidth / 2 + 16
+                          }
+                          // 下边界检测 - 如果下方空间不足，显示在按钮上方
+                          if (y + menuHeight > window.innerHeight - 16) {
+                            y = rect.top - menuHeight - 8
+                          }
+                          setProjectMenu({
+                            project,
+                            x,
+                            y,
+                          })
+                        }}
+                        onPointerDown={(e) => {
+                          e.stopPropagation()
+                          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                          const menuWidth = 140
+                          const menuHeight = 100
+                          let x = rect.left + rect.width / 2
+                          let y = rect.bottom + 8
+                          // 右边界检测
+                          if (x + menuWidth / 2 > window.innerWidth - 16) {
+                            x = window.innerWidth - menuWidth / 2 - 16
+                          }
+                          // 左边界检测
+                          if (x - menuWidth / 2 < 16) {
+                            x = menuWidth / 2 + 16
+                          }
+                          // 下边界检测
+                          if (y + menuHeight > window.innerHeight - 16) {
+                            y = rect.top - menuHeight - 8
+                          }
+                          setProjectMenu({
+                            project,
+                            x,
+                            y,
+                          })
+                        }}
+                        title="更多选项"
+                      >
+                        <Icon name="more" size={16} />
+                      </button>
                     </div>
                   )
                 })
@@ -599,24 +673,32 @@ export default function SessionManagerV2({
               <span>新 Project</span>
             </button>
 
-            {/* Project 长按菜单 */}
-            {projectLongPressMenu && (
+            {/* Project 菜单 */}
+            {projectMenu && (
               <>
                 <div
                   style={s.menuOverlay}
-                  onPointerDown={() => setProjectLongPressMenu(null)}
+                  onPointerDown={() => setProjectMenu(null)}
                 />
                 <div
                   style={{
                     ...s.longPressMenu,
-                    left: projectLongPressMenu.x,
-                    top: projectLongPressMenu.y,
+                    left: projectMenu.x,
+                    top: projectMenu.y,
                   }}
                 >
-                  <div style={s.menuTitle}>{projectLongPressMenu.project.name}</div>
+                  <div style={s.menuTitle}>{projectMenu.project.name}</div>
+                  <button
+                    style={s.menuItem}
+                    onPointerDown={() => handleRenameProject(projectMenu.project)}
+                  >
+                    <Icon name="pencil" size={14} />
+                    <span>重命名</span>
+                  </button>
+                  <div style={s.menuDivider} />
                   <button
                     style={{ ...s.menuItem, ...s.menuItemDanger }}
-                    onPointerDown={() => handleCloseProject(projectLongPressMenu.project)}
+                    onPointerDown={() => handleCloseProject(projectMenu.project)}
                   >
                     <Icon name="x" size={14} />
                     <span>关闭 Project</span>
@@ -680,13 +762,16 @@ const s: Record<string, React.CSSProperties> = {
   projectsSection: { padding: '12px 0', flex: '1 1 auto', display: 'flex', flexDirection: 'column', background: 'var(--nexus-bg2)', minHeight: 120 },
 
   // Project 项
-  projectItem: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 6, cursor: 'pointer', marginBottom: 2 },
+  projectItem: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 6, cursor: 'pointer', marginBottom: 2, WebkitUserSelect: 'none', userSelect: 'none', WebkitTouchCallout: 'none', touchAction: 'manipulation', WebkitTapHighlightColor: 'rgba(128,128,128,0.3)' },
   projectItemActive: { background: 'rgba(59,130,246,0.15)' },
   projectItemPressed: { background: 'var(--nexus-border)', transition: 'none' },
   projectDot: { width: 8, height: 8, borderRadius: '50%', background: 'var(--nexus-muted)', flexShrink: 0 },
   projectDotActive: { width: 8, height: 8, borderRadius: '50%', background: '#3b82f6', flexShrink: 0 },
   projectName: { flex: 1, fontSize: 14, color: 'var(--nexus-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   channelCount: { fontSize: 12, color: 'var(--nexus-text2)', fontFamily: 'monospace' },
+
+  // Project 菜单按钮
+  projectMenuBtn: { background: 'transparent', border: 'none', color: 'var(--nexus-text2)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.6, transition: 'opacity 0.15s' },
 
   // 空状态
   emptyState: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 16px', color: 'var(--nexus-muted)' },
@@ -700,6 +785,7 @@ const s: Record<string, React.CSSProperties> = {
   // 长按菜单
   menuOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 150 },
   longPressMenu: { position: 'fixed', transform: 'translateX(-50%)', background: 'var(--nexus-bg)', border: '1px solid var(--nexus-border)', borderRadius: 8, padding: '4px 0', minWidth: 120, boxShadow: '0 4px 20px rgba(0,0,0,0.3)', zIndex: 151 },
+  menuTitle: { padding: '8px 16px', fontSize: 12, fontWeight: 600, color: 'var(--nexus-text2)', borderBottom: '1px solid var(--nexus-border)', marginBottom: 4 },
   menuItem: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', background: 'transparent', border: 'none', color: 'var(--nexus-text)', fontSize: 14, cursor: 'pointer', width: '100%', textAlign: 'left' },
   menuItemDanger: { color: 'var(--nexus-error)' },
   menuDivider: { height: 1, background: 'var(--nexus-border)', margin: '4px 0' },

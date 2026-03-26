@@ -616,6 +616,37 @@ app.post('/api/projects/:name/activate', authMiddleware, (req, res) => {
   res.json({ active: true, project: sessionName, lastChannel })
 })
 
+// POST /api/projects/:name/rename — 重命名 Project（重命名 tmux session）
+app.post('/api/projects/:name/rename', authMiddleware, (req, res) => {
+  const oldName = req.params.name
+  const { name: newName } = req.body || {}
+  if (!newName || !newName.trim()) {
+    return res.status(400).json({ error: 'new name required' })
+  }
+  const sanitizedNewName = newName.trim().replace(/[^a-zA-Z0-9_\-]/g, '')
+  if (!sanitizedNewName) {
+    return res.status(400).json({ error: 'invalid name format' })
+  }
+  // 验证旧 session 存在
+  try {
+    execSync(`tmux has-session -t ${oldName}`)
+  } catch {
+    return res.status(404).json({ error: 'project not found' })
+  }
+  // 检查新名称是否已存在
+  try {
+    execSync(`tmux has-session -t ${sanitizedNewName}`)
+    return res.status(409).json({ error: 'project name already exists' })
+  } catch {
+    // 不存在，可以重命名
+  }
+  // 执行重命名
+  exec(`tmux rename-session -t ${oldName} ${sanitizedNewName}`, (err) => {
+    if (err) return res.status(500).json({ error: err.message })
+    res.json({ ok: true, oldName, newName: sanitizedNewName })
+  })
+})
+
 // DELETE /api/projects/:name — 关闭 Project（kill tmux session）
 app.delete('/api/projects/:name', authMiddleware, (req, res) => {
   const sessionName = req.params.name
