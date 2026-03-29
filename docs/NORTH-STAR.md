@@ -8,7 +8,7 @@
 
 ### 轴一：AI 全域工作能力
 AI Agent 能在我的任意项目目录中运行，拥有完整的文件系统读写权限和项目上下文。
-当前实现：Claude Code via `cc:nexus` 容器，WORKSPACE_ROOT 整体挂载。
+当前实现：Claude Code 直接在宿主机（WSL2）运行，WORKSPACE_ROOT 指向宿主机工作区。
 
 ### 轴二：零摩擦上下文同步
 无论我在哪里、用什么设备，都能流畅地将真实世界的上下文（文字、图像、文件、语音）同步给 AI，

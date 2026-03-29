@@ -172,7 +172,7 @@ data/
     └── profile-b.json
 ```
 
-**特点**: 无数据库，JSON 文件 + Docker volume 持久化。tmux 会话状态从 tmux 实时读取。
+**特点**: 无数据库，JSON 文件持久化。tmux 会话状态从 tmux 实时读取。
 
 ---
 
@@ -180,9 +180,11 @@ data/
 
 ```
 nexus/
-├── server.js              # 唯一后端（ESM，Node 20，~954 行）
+├── server.js              # 唯一后端（ESM，Node 20）
 ├── package.json           # 依赖：express ws node-pty bcrypt
 ├── ecosystem.config.cjs   # PM2 配置（当前部署方式）
+├── start.sh               # 手动启动脚本
+├── nexus-run-claude.sh    # claude 会话启动脚本（server.js 调用）
 ├── frontend/
 │   ├── src/               # React + TypeScript 源码
 │   └── dist/              # Vite 构建产物（server.js 静态伺服）
@@ -190,7 +192,7 @@ nexus/
 │   ├── icon.svg           # PWA 图标
 │   ├── manifest.json      # PWA manifest
 │   └── sw.js              # Service Worker（cache-first 静态资源，跳过导航请求）
-└── data/                  # PM2 / Docker volume 挂载点
+└── data/                  # 持久化数据目录
 ```
 
 ### 环境变量
@@ -201,7 +203,7 @@ nexus/
 | `ACC_PASSWORD_HASH` | ✓ | — | bcrypt hash 的登录密码 |
 | `TMUX_SESSION` | | `main` | 要 attach 的 tmux session 名 |
 | `WORKSPACE_ROOT` | | `/home/librae` | 工作区根目录 |
-| `PORT` | | `3000` | 监听端口 |
+| `PORT` | | `59000` | 监听端口 |
 | `TELEGRAM_BOT_TOKEN` | | — | Telegram Bot token（可选） |
 | `TELEGRAM_CHAT_ID` | | — | 允许的 Telegram chat ID（可选） |
 | `CLAUDE_PROXY` | | — | HTTP/HTTPS/ALL proxy for claude CLI（可选） |

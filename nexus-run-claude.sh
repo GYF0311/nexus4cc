@@ -67,7 +67,6 @@ if [ -n "$API_TIMEOUT_MS" ]; then
     export API_TIMEOUT_MS="$API_TIMEOUT_MS"
 fi
 export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
-export DOCKER_HOST="tcp://host.docker.internal:2375"
 
 # ── 代理变量：优先使用 NEXUS_PROXY（server.js 注入），其次继承环境 ──
 _proxy="${NEXUS_PROXY:-${HTTP_PROXY:-}}"

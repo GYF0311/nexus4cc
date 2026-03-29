@@ -12,22 +12,22 @@ Anchor: `docs/NORTH-STAR.md` — 修改任何文档前先对照锚点三原则
 | Backend | Node.js (ESM) + Express + ws + node-pty |
 | Frontend | React 18 + TypeScript + xterm.js + Vite |
 | Auth | JWT (30d) + bcrypt password hash |
-| Runtime | Docker `cc:nexus`（基于 `cc:latest`，含 claude CLI + tmux） |
+| Runtime | 宿主机（WSL2）直接运行，Node.js + PM2 管理 |
 | Config | `.env` → `server.js` 顶部解构，无 dotenv 依赖 |
-| Persist | `./data/` volume（toolbar config、session configs） |
+| Persist | `./data/`（toolbar config、session configs） |
 
 ## Architecture Constraints
 
 - **多 PTY 架构**（F-11）：每个 `tmux session:window` 独立 PTY 实例，`ptyMap` 管理
 - **前端 dist 由 Vite 构建**，server.js 静态伺服 `frontend/dist/` + `public/`
 - **no database**：会话状态从 tmux 实时读取，持久化只用 JSON 文件
-- `WORKSPACE_ROOT` 整体挂载进容器，路径与宿主机完全一致
+- `WORKSPACE_ROOT` 指向宿主机工作区根目录，server.js 直接访问
 
 ## Key Files
 
 ```
 server.js                  # 唯一后端入口：Express + WS + PTY + Tasks + Telegram
-data/                      # Docker volume 持久化（toolbar、tasks、configs）
+data/                      # 持久化数据（toolbar、tasks、configs）
 public/
   sw.js                    # Service Worker（cache-first 静态资源）
   icon.svg                 # PWA 图标
@@ -92,15 +92,6 @@ Rules: English subject, imperative mood, no trailing period, blank line before b
 - Secrets via env vars only — never hardcoded
 - `.env` must not be committed (verify `.gitignore`)
 - CORS: production must list explicit origins, no wildcards
-
-## Docker Access Constraints
-
-Claude runs with host Docker socket access — high privilege, strictly scoped.
-
-**Allowed:** `docker compose ps/up/down/logs/build/exec` on this project only.
-**Prohibited:** global prune commands; touching other projects' containers.
-
-Host service access: `host.docker.internal:<port>`
 
 ## Agentic Behavior
 
