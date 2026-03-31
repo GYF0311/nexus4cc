@@ -223,7 +223,14 @@ app.post('/api/sessions', authMiddleware, (req, res) => {
 // GET /api/configs — 列出所有 claude 配置 profile
 app.get('/api/configs', authMiddleware, (req, res) => {
   try {
-    const files = readdirSync(CONFIGS_DIR).filter(f => f.endsWith('.json'));
+    const files = readdirSync(CONFIGS_DIR, { withFileTypes: true })
+      .filter(f => f.isFile() && f.name.endsWith('.json'))
+      .map(f => ({
+        name: f.name,
+        mtime: statSync(join(CONFIGS_DIR, f.name)).mtimeMs,
+      }))
+      .sort((a, b) => b.mtime - a.mtime)
+      .map(f => f.name);
     const configs = files.map(f => {
       const id = f.replace('.json', '');
       try {
@@ -572,6 +579,7 @@ app.get('/api/projects', authMiddleware, (req, res) => {
         channelCount: Number(windows) || 0
       }
     })
+    projects.reverse()
     res.json(projects)
   })
 })
@@ -592,6 +600,8 @@ app.get('/api/projects/:name/channels', authMiddleware, (req, res) => {
         const cwd = parts.slice(3).join(':') || ''
         return { index, name, active, cwd }
       })
+      // 新创建的频道排在上面
+      channels.reverse()
       res.json({ project: sessionName, channels })
     }
   )

@@ -182,10 +182,10 @@ export default function SessionManager({ token, onClose }: Props) {
               <div className="text-nexus-muted text-sm py-2">{t('apiConfig.noConfigs')}</div>
             )}
             {configs.map(cfg => (
-              <div key={cfg.id} className="flex items-center gap-2.5 py-2.5 border-b border-nexus-border">
-                <div className="flex-1">
-                  <div className="text-nexus-text text-sm">{cfg.label}</div>
-                  <div className="text-nexus-muted text-[11px] mt-0.5 font-mono">{cfg.id} · {cfg.DEFAULT_MODEL || '—'}</div>
+              <div key={cfg.id} className="flex items-center gap-2.5 py-2.5">
+                <div className="flex-1 min-w-0">
+                  <div className="text-nexus-text text-sm truncate">{cfg.label}</div>
+                  <div className="text-nexus-muted text-[11px] mt-0.5 font-mono truncate" title={`${cfg.id} · ${cfg.DEFAULT_MODEL || '—'}`}>{cfg.id} · {cfg.DEFAULT_MODEL || '—'}</div>
                 </div>
                 <div className="flex gap-1.5 shrink-0">
                   <button

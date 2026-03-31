@@ -427,7 +427,7 @@ export default function SessionManagerV2({
                   return (
                     <div
                       key={channel.index}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer mb-0.5 select-none touch-manipulation transition-colors duration-75 ${isActive ? 'bg-nexus-bg-2' : ''} ${pressedChannel === channel.index ? 'bg-nexus-border transition-none' : ''}`}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer mb-0.5 select-none touch-manipulation transition-colors duration-75 min-w-0 ${isActive ? 'bg-nexus-bg-2' : ''} ${pressedChannel === channel.index ? 'bg-nexus-border transition-none' : ''}`}
                       style={{ WebkitTouchCallout: 'none', WebkitTapHighlightColor: 'rgba(128,128,128,0.3)' }}
                       onTouchStart={(e) => {
                         handleChannelTouchStart(channel, e)
@@ -444,7 +444,7 @@ export default function SessionManagerV2({
                         title={status}
                       />
                       <span className="text-nexus-text-2 text-[13px] font-medium select-none">#</span>
-                      <span className="flex-1 text-sm text-nexus-text overflow-hidden text-ellipsis whitespace-nowrap">{channel.name}</span>
+                      <span className="flex-1 text-sm text-nexus-text overflow-hidden text-ellipsis whitespace-nowrap min-w-0" title={channel.name}>{channel.name}</span>
                       {/* 三个点菜单按钮 */}
                       <button
                         className="bg-transparent border-none text-nexus-text-2 cursor-pointer p-1 flex items-center justify-center opacity-60 transition-opacity duration-150"
@@ -594,7 +594,7 @@ export default function SessionManagerV2({
                       }}
                     >
                       <span className={`w-2 h-2 rounded-full shrink-0 ${isActive ? 'bg-blue-500' : 'bg-nexus-muted'}`} />
-                      <span className="flex-1 text-sm text-nexus-text overflow-hidden text-ellipsis whitespace-nowrap">{project.name}</span>
+                      <span className="flex-1 text-sm text-nexus-text overflow-hidden text-ellipsis whitespace-nowrap min-w-0" title={project.name}>{project.name}</span>
                       <span className="text-xs text-nexus-text-2 font-mono">({project.channelCount})</span>
                       {/* 三个点菜单按钮 */}
                       <button
