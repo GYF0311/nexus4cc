@@ -1235,17 +1235,7 @@ export default function Terminal({ token }: Props) {
     const saved = localStorage.getItem('nexus_sidebar_collapsed')
     return saved !== null ? saved === 'true' : true // default collapsed
   })
-  const [sidebarPinned, setSidebarPinned] = useState(() => {
-    const saved = localStorage.getItem('nexus_sidebar_pinned')
-    return saved !== null ? saved === 'true' : false
-  })
-
-  // When pinned, sidebar never collapses on background click
-  const handleSidebarCollapse = useCallback((collapsed: boolean) => {
-    if (sidebarPinned) return
-    setSidebarCollapsed(collapsed)
-    localStorage.setItem('nexus_sidebar_collapsed', String(collapsed))
-  }, [sidebarPinned])
+  // Sidebar toggled only by the explicit chevron buttons
   useEffect(() => {
     const el = toolbarWrapRef.current
     if (!el) return
@@ -1383,10 +1373,6 @@ export default function Terminal({ token }: Props) {
             <div
               className="flex-shrink-0 flex flex-col bg-nexus-bg"
               style={{ width: sidebarCollapsed ? 48 : 220, overflow: 'hidden' }}
-              onClick={() => {
-                setSidebarCollapsed(!sidebarCollapsed)
-                localStorage.setItem('nexus_sidebar_collapsed', String(!sidebarCollapsed))
-              }}
             >
               {sidebarCollapsed ? (
                 /* Collapsed Sidebar - Icon Only */
@@ -1394,6 +1380,14 @@ export default function Terminal({ token }: Props) {
                   className="flex-1 flex flex-col min-h-0 overflow-hidden bg-nexus-bg"
                   style={{ maxWidth: 48 }}
                 >
+                  {/* Expand button at top */}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setSidebarCollapsed(false); localStorage.setItem('nexus_sidebar_collapsed', 'false'); }}
+                    className="w-12 h-10 bg-transparent border-none text-nexus-text-2 flex items-center justify-center cursor-pointer shrink-0"
+                    title="展开侧边栏"
+                  >
+                    <Icon name="chevronRight" size={18} />
+                  </button>
                   {/* Scrollable window indicators */}
                   <div
                     className="flex-1 overflow-y-auto overflow-x-hidden py-2 flex flex-col gap-0.5"
@@ -1492,16 +1486,17 @@ export default function Terminal({ token }: Props) {
                 </div>
               ) : (
                 /* Expanded Sidebar: session manager + fixed bottom bar */
-                <div
-                  className="flex-1 flex flex-col min-h-0 overflow-hidden"
-                >
+                <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
+                  {/* Collapse button in header area */}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setSidebarCollapsed(true); localStorage.setItem('nexus_sidebar_collapsed', 'true'); }}
+                    className="absolute top-1 right-1 z-50 w-7 h-7 flex items-center justify-center rounded cursor-pointer bg-nexus-bg/80 border border-nexus-border text-nexus-text-2 hover:bg-nexus-bg transition-colors"
+                    title="收起侧边栏"
+                  >
+                    <Icon name="chevronLeft" size={16} />
+                  </button>
                   <div
                     className="flex-1 min-h-0 overflow-hidden"
-                    onClick={(e) => {
-                      if (e.target === e.currentTarget) {
-                        handleSidebarCollapse(true)
-                      }
-                    }}
                   >
                     <SessionManagerV2
                       ref={sessionManagerRef}
@@ -1509,19 +1504,10 @@ export default function Terminal({ token }: Props) {
                       currentProject={activeTmuxSession}
                       currentChannelIndex={activeWindowIndex}
                       onClose={() => {}}
-                      isPinned={sidebarPinned}
-                      onTogglePin={() => {
-                        const next = !sidebarPinned
-                        setSidebarPinned(next)
-                        localStorage.setItem('nexus_sidebar_pinned', String(next))
-                      }}
                       onSwitchProject={(name) => handleSwitchSession(name)}
                       onSwitchChannel={(idx) => attachToWindow(idx)}
                       onNewProject={openNewSessionDialog}
                       onNewChannel={handleCreateWindow}
-                      onBackgroundClick={() => {
-                        handleSidebarCollapse(true)
-                      }}
                       layout="sidebar"
                     />
                   </div>

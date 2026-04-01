@@ -7,7 +7,7 @@ import React from 'react'
 export type IconName =
   | 'sun' | 'moon' | 'pencil' | 'clipboard' | 'paperclip'
   | 'check' | 'x' | 'more' | 'settings' | 'chevronDown'
-  | 'chevronUp' | 'grip' | 'trash' | 'plus' | 'copy'
+  | 'chevronUp' | 'chevronLeft' | 'chevronRight' | 'grip' | 'trash' | 'plus' | 'copy'
   | 'arrowDown' | 'arrowLeft' | 'arrowRight' | 'message'
   | 'play' | 'stop' | 'refresh' | 'history' | 'pin' | 'folder'
   | 'folderPlus' | 'image'
@@ -67,6 +67,12 @@ const ICONS: Record<IconName, React.ReactNode> = {
   ),
   chevronUp: (
     <polyline points="18 15 12 9 6 15" />
+  ),
+  chevronLeft: (
+    <polyline points="9 6 15 12 9 18" />
+  ),
+  chevronRight: (
+    <polyline points="6 9 12 15 18 9" />
   ),
   grip: (
     <g>

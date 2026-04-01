@@ -26,13 +26,9 @@ interface Props {
   onSwitchChannel: (channelIndex: number) => void
   onNewProject: () => void
   onNewChannel: () => void
-  onBackgroundClick?: () => void
   /** Refresh callback — exposed for sidebar toggle integration */
   onRefresh?: () => void
   layout?: 'modal' | 'sidebar'
-  /** Whether the sidebar is pinned (show pin button to prevent auto-collapse) */
-  isPinned?: boolean
-  onTogglePin?: () => void
 }
 
 function useIsDesktop() {
@@ -71,9 +67,6 @@ export default forwardRef<SessionManagerV2Handle, Props>(function SessionManager
   onNewProject,
   onNewChannel,
   onRefresh: _onRefresh,
-  onBackgroundClick,
-  isPinned = false,
-  onTogglePin,
   layout = 'modal',
 }: Props, ref) {
   const { t } = useTranslation()
@@ -388,9 +381,6 @@ export default forwardRef<SessionManagerV2Handle, Props>(function SessionManager
 
           <div
             className="flex-1 overflow-y-auto px-1.5 min-h-0"
-            onClick={(e) => {
-              if (onBackgroundClick && e.target === e.currentTarget) onBackgroundClick()
-            }}
           >
             {loadingProjects ? (
               <div className="text-nexus-muted text-sm px-3 py-2">{t('common.loading')}</div>
@@ -455,9 +445,6 @@ export default forwardRef<SessionManagerV2Handle, Props>(function SessionManager
 
           <div
             className="flex-1 overflow-y-auto px-1.5 min-h-0"
-            onClick={(e) => {
-              if (onBackgroundClick && e.target === e.currentTarget) onBackgroundClick()
-            }}
           >
             {loadingChannels ? (
               <div className="text-nexus-muted text-sm px-3 py-2">{t('common.loading')}</div>
@@ -547,19 +534,10 @@ export default forwardRef<SessionManagerV2Handle, Props>(function SessionManager
         )}
 
         {/* Projects section: 50% height, internal scroll */}
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden" style={{ flex: '1 1 50%' }}>
+        <div className="flex flex-col min-h-0 overflow-hidden" style={{ flex: '1 1 50%' }}>
           <div className="px-3 py-1.5 border-b border-nexus-border shrink-0">
             <div className="text-xs font-semibold text-nexus-text tracking-wide flex items-center justify-between gap-1.5">
               <div className="flex items-center gap-1.5">
-                {isPinned !== undefined && onTogglePin && (
-                  <button
-                    className={`bg-transparent border-none cursor-pointer p-1 flex items-center justify-center transition-opacity ${isPinned ? 'text-nexus-accent opacity-100' : 'text-nexus-text-2 opacity-70 hover:opacity-100'}`}
-                    onClick={onTogglePin}
-                    title={isPinned ? '取消固定' : '固定侧边栏'}
-                  >
-                    <Icon name="pin" size={14} />
-                  </button>
-                )}
                 <span className="text-sm">📁</span>
                 {t('sessionMgr.projects')}
               </div>
@@ -574,7 +552,6 @@ export default forwardRef<SessionManagerV2Handle, Props>(function SessionManager
           </div>
           <div
             className="flex-1 overflow-y-auto px-1.5 py-1"
-            onClick={(e) => { if (onBackgroundClick && e.target === e.currentTarget) onBackgroundClick() }}
           >
             {loadingProjects ? (
               <div className="text-nexus-muted text-sm px-3 py-2">{t('common.loading')}</div>
@@ -616,7 +593,7 @@ export default forwardRef<SessionManagerV2Handle, Props>(function SessionManager
         <div className="flex-shrink-0 h-px bg-nexus-border" />
 
         {/* Channels section: 50% height, internal scroll */}
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden" style={{ flex: '1 1 50%' }}>
+        <div className="flex flex-col min-h-0 overflow-hidden" style={{ flex: '1 1 50%' }}>
           <div className="px-3 py-1.5 border-b border-nexus-border shrink-0">
             <div className="text-xs font-semibold text-nexus-text tracking-wide flex items-center gap-1.5">
               <span className="text-sm">#</span>
@@ -625,7 +602,6 @@ export default forwardRef<SessionManagerV2Handle, Props>(function SessionManager
           </div>
           <div
             className="flex-1 overflow-y-auto px-1.5 py-1"
-            onClick={(e) => { if (onBackgroundClick && e.target === e.currentTarget) onBackgroundClick() }}
           >
             {loadingChannels ? (
               <div className="text-nexus-muted text-sm px-3 py-2">{t('common.loading')}</div>
