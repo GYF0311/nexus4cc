@@ -360,7 +360,7 @@ export default forwardRef<SessionManagerV2Handle, Props>(function SessionManager
 
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
         {/* Project 列表 */}
-        <div className="py-2 flex flex-col min-h-0" style={{ flex: '1 1 50%' }}>
+        <div className="py-2 flex flex-col min-h-0" >
           <div className="px-3 pb-1.5 border-b border-nexus-border mb-1.5">
             <div className="text-xs font-semibold text-nexus-text tracking-wide flex items-center justify-between gap-1.5">
               <div className="flex items-center gap-1.5">
@@ -435,7 +435,7 @@ export default forwardRef<SessionManagerV2Handle, Props>(function SessionManager
         </div>
 
         {/* Channel 列表 */}
-        <div className="py-2 flex flex-col min-h-0" style={{ flex: '1 1 50%' }}>
+        <div className="py-2 flex flex-col min-h-0" >
           <div className="px-3 pb-1.5 border-b border-nexus-border mb-1.5">
             <div className="text-xs font-semibold text-nexus-text tracking-wide flex items-center gap-1.5">
               <span className="text-sm">#</span>
@@ -522,7 +522,7 @@ export default forwardRef<SessionManagerV2Handle, Props>(function SessionManager
   if (isSidebar) {
     return (
       <div
-        className="flex-1 flex flex-col min-h-0 bg-nexus-bg text-nexus-text"
+        className="grid grid-rows-[1fr_auto_1fr] bg-nexus-bg text-nexus-text h-full"
       >
         {error && (
           <div className="bg-red-500/15 text-nexus-error px-4 py-2.5 text-sm flex items-center justify-between border-b border-nexus-border shrink-0">
@@ -534,8 +534,8 @@ export default forwardRef<SessionManagerV2Handle, Props>(function SessionManager
         )}
 
         {/* Projects section: 50% height, internal scroll */}
-        <div className="flex flex-col min-h-0 overflow-hidden" style={{ flex: '1 1 50%' }}>
-          <div className="px-3 py-1.5 border-b border-nexus-border shrink-0">
+        <div className="flex flex-col overflow-hidden">
+          <div className="px-3 pr-10 py-1.5 border-b border-nexus-border shrink-0">
             <div className="text-xs font-semibold text-nexus-text tracking-wide flex items-center justify-between gap-1.5">
               <div className="flex items-center gap-1.5">
                 <span className="text-sm">📁</span>
@@ -551,7 +551,7 @@ export default forwardRef<SessionManagerV2Handle, Props>(function SessionManager
             </div>
           </div>
           <div
-            className="flex-1 overflow-y-auto px-1.5 py-1"
+            className="flex-1 min-h-0 overflow-y-auto px-1.5 py-1"
           >
             {loadingProjects ? (
               <div className="text-nexus-muted text-sm px-3 py-2">{t('common.loading')}</div>
@@ -593,15 +593,15 @@ export default forwardRef<SessionManagerV2Handle, Props>(function SessionManager
         <div className="flex-shrink-0 h-px bg-nexus-border" />
 
         {/* Channels section: 50% height, internal scroll */}
-        <div className="flex flex-col min-h-0 overflow-hidden" style={{ flex: '1 1 50%' }}>
-          <div className="px-3 py-1.5 border-b border-nexus-border shrink-0">
+        <div className="flex flex-col overflow-hidden">
+          <div className="px-3 pr-10 py-1.5 border-b border-nexus-border shrink-0">
             <div className="text-xs font-semibold text-nexus-text tracking-wide flex items-center gap-1.5">
               <span className="text-sm">#</span>
               {t('sessionMgr.channels')}
             </div>
           </div>
           <div
-            className="flex-1 overflow-y-auto px-1.5 py-1"
+            className="flex-1 min-h-0 overflow-y-auto px-1.5 py-1"
           >
             {loadingChannels ? (
               <div className="text-nexus-muted text-sm px-3 py-2">{t('common.loading')}</div>
