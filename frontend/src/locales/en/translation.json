@@ -58,7 +58,8 @@
     "folderNamePlaceholder": "Folder name",
     "fileNamePlaceholder": "Filename (e.g. readme.txt, notes.md)",
     "fileExtensionsHint": "Supports .txt, .md, .json and any extension",
-    "chars": "chars"
+    "chars": "chars",
+    "preview": "Preview"
   },
   "newChannel": {
     "title": "New Channel",

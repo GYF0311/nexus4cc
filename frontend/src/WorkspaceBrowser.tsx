@@ -96,6 +96,7 @@ export default function WorkspaceBrowser({ token, onClose, initialPath = '', cur
   const [editingFile, setEditingFile] = useState<{ name: string; path: string; content: string } | null>(null)
   const [editorContent, setEditorContent] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [isPreviewMode, setIsPreviewMode] = useState(false)
 
   // 加载目录内容
   const loadEntries = useCallback(async (path: string) => {
@@ -235,6 +236,7 @@ export default function WorkspaceBrowser({ token, onClose, initialPath = '', cur
       const data = await r.json()
       setEditingFile({ name, path: filePath, content: data.content })
       setEditorContent(data.content)
+      setIsPreviewMode(false)
     } catch (e: any) {
       setError(e.message || 'Failed to open file')
     }
@@ -274,6 +276,12 @@ export default function WorkspaceBrowser({ token, onClose, initialPath = '', cur
     const ext = name.split('.').pop()?.toLowerCase() || ''
     const textExts = ['txt', 'md', 'js', 'ts', 'jsx', 'tsx', 'json', 'yml', 'yaml', 'toml', 'css', 'html', 'htm', 'xml', 'svg', 'sh', 'bash', 'zsh', 'py', 'go', 'rs', 'java', 'c', 'cpp', 'h', 'hpp', 'log', 'env', 'dockerfile', 'gitignore']
     return textExts.includes(ext) || !ext
+  }
+
+  // 判断是否为 Markdown 文件
+  function isMarkdownFile(name: string): boolean {
+    const ext = name.split('.').pop()?.toLowerCase() || ''
+    return ext === 'md' || ext === 'markdown'
   }
 
   // 构建面包屑路径（使用绝对路径）
@@ -559,8 +567,21 @@ export default function WorkspaceBrowser({ token, onClose, initialPath = '', cur
                 <Icon name="save" size={14} />
                 {isSaving ? t('common.saving') : t('common.save')}
               </button>
+              {editingFile && isMarkdownFile(editingFile.name) && (
+                <button
+                  onClick={() => setIsPreviewMode(!isPreviewMode)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded transition-colors border ${
+                    isPreviewMode
+                      ? 'bg-nexus-accent text-white border-nexus-accent'
+                      : 'bg-nexus-bg-2 text-nexus-text border-nexus-border hover:bg-nexus-bg-2/80'
+                  }`}
+                >
+                  <Icon name="eye" size={14} />
+                  {isPreviewMode ? t('workspace.edit') : t('workspace.preview')}
+                </button>
+              )}
               <button
-                onClick={() => { setEditingFile(null); setEditorContent('') }}
+                onClick={() => { setEditingFile(null); setEditorContent(''); setIsPreviewMode(false) }}
                 className="bg-transparent border-none text-nexus-text-2 cursor-pointer p-1.5 flex items-center justify-center rounded-md"
               >
                 <Icon name="x" size={20} />
@@ -569,12 +590,18 @@ export default function WorkspaceBrowser({ token, onClose, initialPath = '', cur
           </div>
           {/* Editor Content */}
           <div className="flex-1 p-4 overflow-hidden">
-            <textarea
-              value={editorContent}
-              onChange={(e) => setEditorContent(e.target.value)}
-              className="w-full h-full bg-nexus-bg-2 border border-nexus-border rounded p-3 text-nexus-text text-sm font-mono resize-none focus:outline-none focus:border-nexus-accent"
-              spellCheck={false}
-            />
+            {editingFile && isMarkdownFile(editingFile.name) && isPreviewMode ? (
+              <div className="w-full h-full bg-nexus-bg-2 border border-nexus-border rounded p-4 overflow-y-auto">
+                <MarkdownPreview content={editorContent} />
+              </div>
+            ) : (
+              <textarea
+                value={editorContent}
+                onChange={(e) => setEditorContent(e.target.value)}
+                className="w-full h-full bg-nexus-bg-2 border border-nexus-border rounded p-3 text-nexus-text text-sm font-mono resize-none focus:outline-none focus:border-nexus-accent"
+                spellCheck={false}
+              />
+            )}
           </div>
           {/* Editor Footer */}
           <div className="px-4 py-2 border-t border-nexus-border flex items-center justify-between text-xs text-nexus-muted">
@@ -603,4 +630,85 @@ function getFileIcon(name: string): string {
     dockerfile: '🐳', env: '🔐',
   }
   return iconMap[ext] || '📄'
+}
+
+// Simple Markdown preview component
+function MarkdownPreview({ content }: { content: string }) {
+  const html = renderMarkdown(content)
+  return (
+    <div
+      className="prose prose-invert prose-sm max-w-none text-nexus-text"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  )
+}
+
+// Simple Markdown renderer (supports common syntax)
+function renderMarkdown(text: string): string {
+  let html = escapeHtml(text)
+
+  // Code blocks (```lang\ncode\n```)
+  html = html.replace(/```([\w]*)(?:\n)?([\s\S]*?)```/g, (_, _lang, code) => {
+    return `<pre class="bg-nexus-bg p-3 rounded overflow-x-auto my-2"><code class="text-nexus-text text-xs font-mono">${code.trim()}</code></pre>`
+  })
+
+  // Inline code (`code`)
+  html = html.replace(/`([^`]+)`/g, '<code class="bg-nexus-bg px-1 py-0.5 rounded text-xs font-mono text-nexus-accent">$1</code>')
+
+  // Headers (# ## ###)
+  html = html.replace(/^### (.*$)/gim, '<h3 class="text-lg font-semibold mt-4 mb-2 text-nexus-text">$1</h3>')
+  html = html.replace(/^## (.*$)/gim, '<h2 class="text-xl font-semibold mt-5 mb-3 text-nexus-text">$1</h2>')
+  html = html.replace(/^# (.*$)/gim, '<h1 class="text-2xl font-bold mt-6 mb-4 text-nexus-text">$1</h1>')
+
+  // Bold and italic
+  html = html.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>')
+  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+  html = html.replace(/\*(.*?)\*/g, '<em>$1</em>')
+  html = html.replace(/___(.*?)___/g, '<strong><em>$1</em></strong>')
+  html = html.replace(/__(.*?)__/g, '<strong>$1</strong>')
+  html = html.replace(/_(.*?)_/g, '<em>$1</em>')
+
+  // Strikethrough
+  html = html.replace(/~~(.*?)~~/g, '<del>$1</del>')
+
+  // Links [text](url)
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-nexus-accent hover:underline">$1</a>')
+
+  // Images ![alt](url)
+  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" class="max-w-full h-auto my-2 rounded" />')
+
+  // Blockquote (> text)
+  html = html.replace(/^> (.*$)/gim, '<blockquote class="border-l-4 border-nexus-accent pl-4 my-2 italic text-nexus-text-2">$1</blockquote>')
+
+  // Unordered lists (- or * item)
+  html = html.replace(/^([\s]*)[-*] (.*$)/gim, (_match, indent, item) => {
+    const depth = indent.length / 2
+    return `<li class="ml-${4 + depth * 4} text-nexus-text">${item}</li>`
+  })
+
+  // Ordered lists (1. item)
+  html = html.replace(/^([\s]*)\d+\. (.*$)/gim, (_match, indent, item) => {
+    const depth = indent.length / 2
+    return `<li class="ml-${4 + depth * 4} text-nexus-text list-decimal">${item}</li>`
+  })
+
+  // Horizontal rule (--- or ***)
+  html = html.replace(/^(---|\*\*\*)$/gim, '<hr class="border-nexus-border my-4" />')
+
+  // Line breaks - preserve paragraphs
+  const paragraphs = html.split('\n\n').filter(p => p.trim())
+  html = paragraphs.map(p => {
+    // Skip if already wrapped in HTML tags
+    if (p.trim().startsWith('<') && p.trim().endsWith('>')) return p
+    // Wrap in paragraph
+    return `<p class="mb-2 text-nexus-text">${p}</p>`
+  }).join('\n')
+
+  return html
+}
+
+function escapeHtml(text: string): string {
+  const div = document.createElement('div')
+  div.textContent = text
+  return div.innerHTML
 }

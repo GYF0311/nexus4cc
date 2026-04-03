@@ -58,7 +58,8 @@
     "folderNamePlaceholder": "文件夹名称",
     "fileNamePlaceholder": "文件名 (如: readme.txt, notes.md)",
     "fileExtensionsHint": "支持 .txt, .md, .json 等任意扩展名",
-    "chars": "字符"
+    "chars": "字符",
+    "preview": "预览"
   },
   "newChannel": {
     "title": "新建频道",
