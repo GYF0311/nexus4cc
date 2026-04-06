@@ -172,7 +172,14 @@ export default function Terminal({ token }: Props) {
   const [drawerRenameIndex, setDrawerRenameIndex] = useState<number | null>(null)
   const [drawerRenameValue, setDrawerRenameValue] = useState('')
   // Toolbar 展开状态（移动端点击空白区域时收起）
-  const [toolbarCollapsed, setToolbarCollapsed] = useState<boolean | undefined>(undefined)
+  // 初始值与 Toolbar 内部逻辑保持一致，确保首次加载时 ref 能正确反映展开状态
+  const [toolbarCollapsed, setToolbarCollapsed] = useState<boolean | undefined>(() => {
+    const saved = localStorage.getItem('nexus_toolbar_collapsed')
+    if (saved !== null) return saved === 'true'
+    return window.innerWidth >= 1024 // PC 默认收起，移动端默认展开
+  })
+  const toolbarCollapsedRef = useRef<boolean | undefined>(undefined)
+  useEffect(() => { toolbarCollapsedRef.current = toolbarCollapsed }, [toolbarCollapsed])
   const [uploadNotifications, setUploadNotifications] = useState<Array<{ id: string; filename: string; path: string }>>([])
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
@@ -970,14 +977,22 @@ export default function Terminal({ token }: Props) {
         return
       }
       if (Math.abs(dy) < TAP_THRESHOLD && Math.abs(dx) < TAP_THRESHOLD) {
-        // Tap toggles keyboard: tap to show, tap again to hide
         const xtermTa = termRef.current?.textarea
+        // 工具栏展开时收起工具栏；若键盘也可见则一并收起
+        if (toolbarCollapsedRef.current === false) {
+          setToolbarCollapsed(true)
+          if (keyboardVisibleRef.current) {
+            keyboardVisibleRef.current = false
+            if (inputRef.current) { inputRef.current.inputMode = 'none'; inputRef.current.blur() }
+            if (xtermTa) { xtermTa.inputMode = 'none'; xtermTa.blur() }
+          }
+          return
+        }
+        // Tap toggles keyboard: tap to show, tap again to hide
         if (keyboardVisibleRef.current) {
           keyboardVisibleRef.current = false
           if (inputRef.current) { inputRef.current.inputMode = 'none'; inputRef.current.blur() }
           if (xtermTa) { xtermTa.inputMode = 'none'; xtermTa.blur() }
-          // 收起工具栏（如果展开的话）
-          setToolbarCollapsed(true)
         } else {
           keyboardVisibleRef.current = true
           // Focus xterm's own textarea — term.onData handles all input natively
