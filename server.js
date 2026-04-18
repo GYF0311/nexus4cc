@@ -1009,6 +1009,11 @@ app.post('/api/launch-iterm', authMiddleware, (req, res) => {
   } catch {
     return res.status(404).json({ error: 'session not found' })
   }
+  // 强制 iTerm2 把 tmux window 以 tab 形式展示（而非独立窗口）
+  // OpenTmuxWindowsIn: 0=独立窗口, 1=新窗口+tabs, 2=已有窗口+tabs
+  try {
+    execSync(`defaults write com.googlecode.iterm2 OpenTmuxWindowsIn -int 2`)
+  } catch {}
   const appleScript = `on run argv
   set sess to item 1 of argv
   tell application "iTerm2"
