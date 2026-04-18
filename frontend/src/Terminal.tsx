@@ -1630,13 +1630,35 @@ export default function Terminal({ token }: Props) {
     }
     const vv = window.visualViewport
     if (!vv) return
+    // iOS 键盘弹起/收起时 visualViewport 动画约 250ms，连续触发多次 resize。
+    // 只做 setVvHeight 会让 ResizeObserver 的 150ms debounce 撞上键盘动画未结束的尺寸，
+    // 结果 xterm cols/rows 算错 → 布局空白 / tmux 位置错位（先生 IMG_5272 现象）。
+    // 显式在 resize 末尾延迟 300ms（超过动画）+ 再 100ms 做一次 fit，覆盖两种时序。
+    let trailingTimer: number | null = null
     const handleResize = () => {
       keyboardVisibleRef.current = vv.height < window.innerHeight * 0.8
       setVvHeight(Math.round(vv.height))
+      // 重置 trailing fit 计时器：resize 连续触发时只在"最后一次 + 300ms"做 fit
+      if (trailingTimer) window.clearTimeout(trailingTimer)
+      trailingTimer = window.setTimeout(() => {
+        const term = termRef.current
+        const fit = fitAddonRef.current
+        if (!term || !fit) return
+        try {
+          fit.fit()
+          if (wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
+          }
+          if (!userScrolledRef.current) term.scrollToBottom()
+        } catch {}
+      }, 300)
     }
     handleResize()
     vv.addEventListener('resize', handleResize)
-    return () => vv.removeEventListener('resize', handleResize)
+    return () => {
+      vv.removeEventListener('resize', handleResize)
+      if (trailingTimer) window.clearTimeout(trailingTimer)
+    }
   }, [isWidePC])
 
   // Layer 2: Global focusin guard — blur any input that triggers keyboard when it should be hidden
