@@ -1635,8 +1635,15 @@ export default function Terminal({ token }: Props) {
     // 结果 xterm cols/rows 算错 → 布局空白 / tmux 位置错位（先生 IMG_5272 现象）。
     // 显式在 resize 末尾延迟 300ms（超过动画）+ 再 100ms 做一次 fit，覆盖两种时序。
     let trailingTimer: number | null = null
+    // 键盘"刚弹起"边沿触发 flag —— 在 debounce 间累积，只要其中一次 resize 把
+    // 键盘状态从隐藏翻成可见，就在最终 trailing fit 里强制 scrollToBottom。
+    // 否则用户若之前往上 scroll 过历史（userScrolledRef=true），键盘弹起后终端
+    // 仍停在历史位置，底部 prompt 被遮 → 先生报的"对话窗口看不见"。
+    let keyboardJustOpened = false
     const handleResize = () => {
-      keyboardVisibleRef.current = vv.height < window.innerHeight * 0.8
+      const keyboardNow = vv.height < window.innerHeight * 0.8
+      if (keyboardNow && !keyboardVisibleRef.current) keyboardJustOpened = true
+      keyboardVisibleRef.current = keyboardNow
       setVvHeight(Math.round(vv.height))
       // 重置 trailing fit 计时器：resize 连续触发时只在"最后一次 + 300ms"做 fit
       if (trailingTimer) window.clearTimeout(trailingTimer)
@@ -1649,7 +1656,14 @@ export default function Terminal({ token }: Props) {
           if (wsRef.current?.readyState === WebSocket.OPEN) {
             wsRef.current.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
           }
-          if (!userScrolledRef.current) term.scrollToBottom()
+          // 键盘刚弹起 → 强制贴底 + 清 userScrolled（意图是输入，必须看到 prompt）
+          if (keyboardJustOpened) {
+            userScrolledRef.current = false
+            term.scrollToBottom()
+            keyboardJustOpened = false
+          } else if (!userScrolledRef.current) {
+            term.scrollToBottom()
+          }
         } catch {}
       }, 300)
     }
