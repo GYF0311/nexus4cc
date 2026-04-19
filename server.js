@@ -1964,51 +1964,138 @@ function readTmuxWindows(sessionName) {
   } catch { return []; }
 }
 
-// 合并：以 snapshot 为主干（保留 shell_type/profile/claudeSessionId），
-// 用 live tmux 校正 window 列表（新增/消失），并刷新 claudeSessionId
+// ========== 进程树探测（用于 reconcile 识别真实 shell_type 与 claudeSessionId）==========
+
+// 一次 ps 拉全系统进程，构造 ppid→children 和 pid→cmd 两张表
+function buildProcessTree() {
+  try {
+    const out = execFileSync('ps', ['-eo', 'pid=,ppid=,command='], {
+      encoding: 'utf8', stdio: 'pipe', maxBuffer: 8 * 1024 * 1024
+    });
+    const childrenOf = new Map();
+    const cmdOf = new Map();
+    for (const line of out.split('\n')) {
+      const m = line.match(/^\s*(\d+)\s+(\d+)\s+(.*)$/);
+      if (!m) continue;
+      const pid = Number(m[1]), ppid = Number(m[2]), cmd = m[3];
+      cmdOf.set(pid, cmd);
+      if (!childrenOf.has(ppid)) childrenOf.set(ppid, []);
+      childrenOf.get(ppid).push(pid);
+    }
+    return { childrenOf, cmdOf };
+  } catch {
+    return { childrenOf: new Map(), cmdOf: new Map() };
+  }
+}
+
+// 从 pane_pid 向下 DFS，找到第一个 claude 进程；识别 `claude` 可执行和 `nexus-run-claude.sh` 包装脚本
+// 返回里顺带从 cmd 里提取 --resume <uuid>（如果有），作为该进程的 session id
+function findClaudeInPane(panePid, tree) {
+  const { childrenOf, cmdOf } = tree;
+  const stack = [Number(panePid)];
+  const seen = new Set();
+  let wrapperSeen = false;
+  while (stack.length) {
+    const pid = stack.pop();
+    if (seen.has(pid)) continue;
+    seen.add(pid);
+    const cmd = cmdOf.get(pid) || '';
+    // claude 可执行本体：进程名 claude（可能带 node 路径前缀），排除 bash wrapper
+    if (/(^|\/| )claude(\s|$)/.test(cmd) && !/nexus-run-claude\.sh/.test(cmd)) {
+      const rm = cmd.match(/--resume\s+([0-9a-f-]{8,})/);
+      return { pid, cmd, sessionId: rm?.[1] || null, viaWrapper: wrapperSeen };
+    }
+    if (/nexus-run-claude\.sh/.test(cmd)) {
+      wrapperSeen = true;
+    }
+    for (const k of childrenOf.get(pid) || []) stack.push(k);
+  }
+  // 即使 claude 本体没在跑（比如处在 "r=restart" 提示），只要 wrapper 活着就算 claude 窗口
+  return wrapperSeen ? { pid: null, cmd: null, sessionId: null, viaWrapper: true } : null;
+}
+
+// 拉所有 session 所有 pane 的 pane_pid 映射（一次 tmux 调用，比循环调 readTmuxWindows 省）
+function listAllTmuxPanes() {
+  try {
+    const out = execFileSync('tmux', [
+      'list-panes', '-a',
+      '-F', '#{session_name}\t#{window_index}\t#{window_name}\t#{pane_pid}\t#{pane_current_path}'
+    ], { encoding: 'utf8', stdio: 'pipe' }).trim();
+    const bySession = new Map();
+    for (const line of out.split('\n').filter(Boolean)) {
+      const [session, idxStr, name, pidStr, cwd] = line.split('\t');
+      if (!bySession.has(session)) bySession.set(session, []);
+      bySession.get(session).push({
+        index: Number(idxStr),
+        name,
+        panePid: Number(pidStr),
+        cwd: cwd || null,
+      });
+    }
+    return bySession;
+  } catch {
+    return new Map();
+  }
+}
+
+// 合并：以 snapshot 为主干，用 live tmux + 进程树校正 shell_type / profile / claudeSessionId
+// 规则：
+//   - shell_type 只升级不降级：进程树有 claude 痕迹 → claude；没有但 snapshot 是 claude 保留（防 resume 提示态误判）
+//   - profile 缺失时回退到 session-level profile（修复手动创建的 claude 窗口丢 profile）
+//   - claudeSessionId 优先用 lsof 查 claude PID 正在写的 .jsonl（精确到进程），lsof 没查到再回退到 snapshot 原值、最后 inferClaudeSessionId 按 cwd mtime 猜
 function reconcileSnapshot() {
   const snap = loadSnapshot();
-  let aliveSessions;
-  try {
-    aliveSessions = execFileSync('tmux', ['list-sessions', '-F', '#{session_name}'], {
-      encoding: 'utf8', stdio: 'pipe'
-    }).trim().split('\n').filter(Boolean);
-  } catch {
-    aliveSessions = [];
+  const panesBySession = listAllTmuxPanes();
+  const aliveSet = new Set(panesBySession.keys());
+  if (!aliveSet.size) {
+    // tmux server 整个挂了：保留 snapshot 原样，等下次启动 restore
+    return;
   }
-  const aliveSet = new Set(aliveSessions);
+
+  // 先把所有 pane 的 claude 进程扫一遍；session id 直接从命令行的 --resume <uuid> 提取
+  const tree = buildProcessTree();
+  const claudeInfoByPane = new Map(); // "session:index" -> { pid, cmd, sessionId, viaWrapper }
+  for (const [sessName, panes] of panesBySession) {
+    for (const p of panes) {
+      const found = findClaudeInPane(p.panePid, tree);
+      if (found) claudeInfoByPane.set(`${sessName}:${p.index}`, found);
+    }
+  }
+
   const next = [];
+  // 1) 先处理 snapshot 里已有的 session，用 live 数据校正
   for (const sess of snap.sessions) {
     if (!aliveSet.has(sess.name)) {
-      // tmux 已经没这个 session —— 保留 spec 以便下次恢复时重建（先生的需求）
-      // 这里的判断：如果 tmux server 整体挂了（aliveSessions 空），所有 spec 都保留；
-      // 如果 server 活着但特定 session 没了（用户主动 kill），也保留（下次 Nexus 启动自动补）
+      // session 不在 tmux 但保留 spec（下次启动 restore 会重建）
       next.push(sess);
       continue;
     }
-    const liveWins = readTmuxWindows(sess.name);
-    const liveIndices = new Set(liveWins.map(w => w.index));
-    // 合并 windows：优先保留 snapshot 里的元数据，补上新出现的（shell_type 默认 bash）
-    const mergedWins = [];
+    const livePanes = panesBySession.get(sess.name) || [];
+    const liveIndices = new Set(livePanes.map(p => p.index));
     const snapByIdx = new Map((sess.windows || []).map(w => [w.index, w]));
-    for (const lw of liveWins) {
-      const prev = snapByIdx.get(lw.index);
-      const shellType = prev?.shell_type ?? 'bash';
-      const winCwd = lw.cwd || prev?.cwd || sess.cwd;
+    const mergedWins = [];
+    for (const lp of livePanes) {
+      const prev = snapByIdx.get(lp.index);
+      const winCwd = lp.cwd || prev?.cwd || sess.cwd;
+      const claudeInfo = claudeInfoByPane.get(`${sess.name}:${lp.index}`);
+      const claudeDetected = !!claudeInfo;
+      // shell_type: 检测到 claude → claude；否则保留 snapshot 原值（不降级），snapshot 没有默认 bash
+      const shellType = claudeDetected ? 'claude' : (prev?.shell_type ?? 'bash');
+      // profile: snapshot 原值 > session-level profile > null
+      const profile = prev?.profile ?? (shellType === 'claude' ? (sess.profile ?? null) : null);
       const merged = {
-        index: lw.index,
-        name: lw.name,
+        index: lp.index,
+        name: lp.name,
         cwd: winCwd,
         shell_type: shellType,
-        profile: prev?.profile ?? null,
+        profile,
       };
       if (shellType === 'claude') {
-        const id = inferClaudeSessionId(winCwd);
-        merged.claudeSessionId = id || prev?.claudeSessionId || null;
+        // session id 优先级：命令行 --resume <id> > snapshot 原值 > cwd mtime 猜测
+        merged.claudeSessionId = claudeInfo?.sessionId || prev?.claudeSessionId || inferClaudeSessionId(winCwd) || null;
       }
       mergedWins.push(merged);
     }
-    // 只保留 tmux 里还存在的 window（被删掉的不再保留）
     next.push({
       name: sess.name,
       cwd: sess.cwd,
@@ -2016,6 +2103,36 @@ function reconcileSnapshot() {
       profile: sess.profile,
       windows: mergedWins.filter(w => liveIndices.has(w.index)),
     });
+  }
+  // 2) tmux 里存在但 snapshot 没记录的 session（比如用户手动 tmux new-session），也纳入 snapshot
+  const snapSet = new Set(snap.sessions.map(s => s.name));
+  for (const [sessName, livePanes] of panesBySession) {
+    if (snapSet.has(sessName)) continue;
+    // session-level shell_type: 只要有一个 pane 检测到 claude 就记 claude
+    const anyClaude = livePanes.some(lp => claudeInfoByPane.has(`${sessName}:${lp.index}`));
+    const sessCwd = livePanes[0]?.cwd || WORKSPACE_ROOT;
+    const sessSpec = {
+      name: sessName,
+      cwd: sessCwd,
+      shell_type: anyClaude ? 'claude' : 'bash',
+      profile: null,
+      windows: livePanes.map(lp => {
+        const claudeInfo = claudeInfoByPane.get(`${sessName}:${lp.index}`);
+        const shellType = claudeInfo ? 'claude' : 'bash';
+        const win = {
+          index: lp.index,
+          name: lp.name,
+          cwd: lp.cwd || sessCwd,
+          shell_type: shellType,
+          profile: null,
+        };
+        if (shellType === 'claude') {
+          win.claudeSessionId = claudeInfo?.sessionId || inferClaudeSessionId(win.cwd) || null;
+        }
+        return win;
+      }),
+    };
+    next.push(sessSpec);
   }
   writeSnapshot({ sessions: next });
 }
@@ -2102,6 +2219,26 @@ function buildShellCmdForSpec({ shell_type, profile, cwd, claudeSessionId }) {
 
 // 启动恢复：对 snapshot 里 tmux 中不存在的 session 按 spec 重建
 let lastRestoreSummary = { restored: [], skipped: [], failed: [], at: null };
+
+// tmux 命令在 tmux server 刚被 kill / socket 异常时可能瞬时失败，带重试
+function tmuxCallWithRetry(args, maxRetries = 3, delayMs = 500) {
+  let lastErr;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      execFileSync('tmux', args, { stdio: 'pipe' });
+      return;
+    } catch (e) {
+      lastErr = e;
+      if (i < maxRetries - 1) {
+        // 同步 sleep（重试间隔很短，无需 async）
+        const until = Date.now() + delayMs;
+        while (Date.now() < until) {}
+      }
+    }
+  }
+  throw lastErr;
+}
+
 function restoreFromSnapshot() {
   const snap = loadSnapshot();
   const summary = { restored: [], skipped: [], failed: [], at: new Date().toISOString() };
@@ -2123,27 +2260,32 @@ function restoreFromSnapshot() {
     try {
       // 先创建 session（第一个 window）
       const first = windows[0];
-      const firstCmd = buildShellCmdForSpec({ shell_type: first.shell_type, profile: first.profile, cwd: first.cwd, claudeSessionId: first.claudeSessionId });
-      execFileSync('tmux', [
+      // 第一个 window 如果没明确 shell_type，继承 session-level
+      const firstShellType = first.shell_type ?? sess.shell_type;
+      const firstProfile = first.profile ?? sess.profile;
+      const firstCmd = buildShellCmdForSpec({ shell_type: firstShellType, profile: firstProfile, cwd: first.cwd, claudeSessionId: first.claudeSessionId });
+      tmuxCallWithRetry([
         'new-session', '-d',
         '-s', sess.name,
         '-n', first.name || 'shell',
         '-c', first.cwd,
         '-e', `NEXUS_CWD=${sess.cwd}`,
         firstCmd,
-      ], { stdio: 'pipe' });
+      ]);
       // 再添加剩余 windows
       for (let i = 1; i < windows.length; i++) {
         const w = windows[i];
-        const cmd = buildShellCmdForSpec({ shell_type: w.shell_type, profile: w.profile, cwd: w.cwd, claudeSessionId: w.claudeSessionId });
+        const wShellType = w.shell_type ?? sess.shell_type;
+        const wProfile = w.profile ?? sess.profile;
+        const cmd = buildShellCmdForSpec({ shell_type: wShellType, profile: wProfile, cwd: w.cwd, claudeSessionId: w.claudeSessionId });
         try {
-          execFileSync('tmux', [
+          tmuxCallWithRetry([
             'new-window',
             '-t', sess.name,
             '-c', w.cwd,
             '-n', w.name || 'shell',
             cmd,
-          ], { stdio: 'pipe' });
+          ]);
         } catch (e) {
           summary.failed.push({ name: `${sess.name}:${w.index}`, reason: e.message });
         }
@@ -2156,6 +2298,9 @@ function restoreFromSnapshot() {
   lastRestoreSummary = summary;
   if (summary.restored.length || summary.failed.length) {
     console.log(`[Snapshot] restored=${summary.restored.length} skipped=${summary.skipped.length} failed=${summary.failed.length}`);
+    if (summary.failed.length) {
+      for (const f of summary.failed) console.warn(`[Snapshot] restore failed: ${f.name} — ${f.reason}`);
+    }
   }
 }
 
@@ -2359,6 +2504,13 @@ server.listen(Number(PORT), '0.0.0.0', () => {
   // Snapshot 恢复：对 snapshot 里 tmux 中不存在的 project/channel 按 spec 重建
   // 对电脑重启、tmux kill-server 等场景自动恢复
   try { restoreFromSnapshot() } catch (e) { console.warn('[Snapshot] restore failed:', e.message) }
+
+  // 启动后立即 reconcile 一次：捕获 restore 后新起的 claude 进程的 session id、
+  // 以及那些已在运行但 snapshot 没标 claude 的窗口；不再等 60s
+  // 延迟 2s 给 restore 出的 shell 命令跑到 claude 启动（nexus-run-claude.sh 需要几百 ms）
+  setTimeout(() => {
+    try { reconcileSnapshot() } catch (e) { console.warn('[Snapshot] initial reconcile failed:', e.message) }
+  }, 2000)
 
   // 定期 reconcile：同步 claude session-id，剔除已删除 window；不改变 session 骨架
   setInterval(() => {
