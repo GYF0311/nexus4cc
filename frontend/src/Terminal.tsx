@@ -961,8 +961,26 @@ export default function Terminal({ token }: Props) {
 
     const container = containerRef.current!
     term.open(container)
-    // Defer initial fit so fonts and flex layout are fully settled
-    requestAnimationFrame(() => fitAddon.fit())
+    // 初始 fit 需要覆盖 3 个 iOS Safari 的真实问题：
+    // 1) rAF 这一次字体可能还没 ready → FitAddon 算字符宽度偏小 → cols 算多 →
+    //    tmux 按错 cols 布局 status line，视觉上就是"终端宽度没收缩到手机大小"
+    // 2) flex 布局要到下一帧才完全稳定（特别是 min-h-0 + overflow-hidden 嵌套）
+    // 3) iOS Safari URL bar 折叠/展开动画期间 100dvh 和 visualViewport 会短暂失配
+    // 对策：rAF + fonts.ready + 延时兜底，任一路径都能把 cols 打回正确值
+    const doInitialFit = () => {
+      try {
+        fitAddon.fit()
+        const t = termRef.current
+        if (t && wsRef.current?.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({ type: 'resize', cols: t.cols, rows: t.rows }))
+        }
+      } catch {}
+    }
+    requestAnimationFrame(doInitialFit)
+    if (document.fonts && typeof document.fonts.ready?.then === 'function') {
+      document.fonts.ready.then(doInitialFit).catch(() => {})
+    }
+    window.setTimeout(doInitialFit, 500)
 
     // On mobile: suppress keyboard from xterm's internal textarea until user explicitly enables it
     const xtermTextarea = term.textarea
@@ -2044,14 +2062,17 @@ export default function Terminal({ token }: Props) {
             windowOutputs={windowOutputs}
             onSwitch={(idx) => attachToWindow(idx)}
           />
-          {/* 移动端隐藏 IME/语音输入代理。position:fixed + opacity:0.01，
+          {/* 移动端隐藏 IME/语音输入代理。opacity:0.01 + 保留真实尺寸，
               iOS 会把它当成真实可见 input（关键点：别用 overflow:hidden 或 width:1px，
-              那样 iOS 认为元素不可见，语音听写按钮会禁用）。font-size 16px 防 iOS 页面 zoom。 */}
+              那样 iOS 认为元素不可见，语音听写按钮会禁用）。font-size 16px 防 iOS 页面 zoom。
+              用 absolute 而非 fixed —— fixed 在 iOS 上锚定 layout viewport，
+              键盘弹起时 layout viewport 不缩，输入框会卡在键盘后面；absolute 锚定外层
+              wrapper（height: vvHeight），wrapper 跟着 visualViewport 缩，输入框自然浮上去。 */}
           <input
             ref={mobileInputRef}
             value={mobileInputValue}
             style={{
-              position: 'fixed',
+              position: 'absolute',
               bottom: (toolbarHeightRef.current || 0) + 4,
               left: 0,
               width: '100%',
